@@ -973,6 +973,7 @@ const messages = {
 		  noTicketsTitle: "Nothing here!",
 		  noTicketsMessage:
 			"No service found with this status or search term",
+		  noMessages: "No messages",
 		  noQueue: "No Queue",
 		  buttons: {
 			accept: "Accept",
