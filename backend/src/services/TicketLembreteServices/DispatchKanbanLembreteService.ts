@@ -152,6 +152,11 @@ const DispatchKanbanLembreteService = async (
       }
     }
 
+    const targetUserId =
+      dest === "usuario" && lembrete.destinoId != null
+        ? Number(lembrete.destinoId)
+        : ticket.userId ?? null;
+
     io.of(nsp).to("notification").emit(`company-${companyId}-kanban-lembrete`, {
       ticketId,
       lembreteId: lembrete.id,
@@ -160,7 +165,7 @@ const DispatchKanbanLembreteService = async (
       tipoGatilho,
       destinoTipo: lembrete.destinoTipo || "interno",
       destinoId: lembrete.destinoId ?? null,
-      targetUserId: ticket.userId ?? null,
+      targetUserId,
       targetQueueId: ticket.queueId ?? null,
       whatsappEnviado: sentWa,
       whatsappErro: waErr
