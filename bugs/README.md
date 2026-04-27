@@ -76,7 +76,7 @@ Formato de cada entrada:
 
 - **Data:** 2026-04-27
 - **Branch:** `setar-limite-de-download`
-- **Commit:** (em aberto — branch não mergeada)
+- **Commit:** mergeada em main
 - **Arquivos alterados:**
   - `backend/src/services/WbotServices/wbotMessageListener.ts`
   - `frontend/src/components/Settings/Options.js`
@@ -91,6 +91,29 @@ Formato de cada entrada:
   1. Configurações → Opções → alterar limite para 1 MiB → salvar
   2. Enviar qualquer foto pelo WhatsApp para o número conectado
   3. Mensagem recebida pelo cliente e registrada no ticket devem bater com o texto configurado (ou padrão se vazio)
+
+---
+
+## [005] Lembrete Kanban sem opção de destino para usuário específico
+
+- **Data:** 2026-04-27
+- **Branch:** `adicionar-destino-usuario-lembrete-kanban`
+- **Commit:** (em aberto)
+- **Arquivos alterados:**
+  - `frontend/src/pages/Kanban/QuadroModal.js`
+  - `backend/src/services/TicketLembreteServices/DispatchKanbanLembreteService.ts`
+- **Reproduzir:** Abrir cartão Kanban → criar/editar lembrete → seção "Destino e ativação" → só existiam 4 opções: Só alerta no sistema, Só o responsável pelo ticket, Grupo/Fila, Contato do ticket (WhatsApp). Não dava para escolher um usuário específico do grupo (ex.: alguém do financeiro ou da produção).
+- **Causa:** Faltava opção `usuario` em `LEMBRETE_DESTINO_OPTIONS`; backend `DispatchKanbanLembreteService` sempre emitia `targetUserId = ticket.userId` (responsável), ignorando outros usuários
+- **Fix:**
+  - Frontend: adicionada opção "Usuário específico (escolha o atendente)" em `LEMBRETE_DESTINO_OPTIONS`
+  - Frontend: useEffect carrega `GET /users/` ao abrir editor de lembrete
+  - Frontend: Select de usuário aparece quando `destinoTipo === "usuario"`; valida que `destinoId` foi escolhido antes de salvar
+  - Backend: `DispatchKanbanLembreteService` agora calcula `targetUserId = lembrete.destinoId` quando `dest === "usuario"` (em vez do responsável do ticket)
+  - `NotificationsPopOver` (já existente) já filtrava `dt === "usuario"` por `targetUserId === user.id`, então a notificação chega só pro usuário escolhido
+- **Verificar:**
+  1. Abrir cartão Kanban → criar lembrete → escolher destino "Usuário específico" → selecionar atendente
+  2. Disparar gatilho (mover coluna, mudar status, etc.)
+  3. Apenas o usuário escolhido recebe a notificação no toast/sino
 
 ---
 

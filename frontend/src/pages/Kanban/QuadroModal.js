@@ -138,6 +138,7 @@ const LEMBRETE_DESTINO_OPTIONS = [
   { value: "interno", label: "Só alerta no sistema" },
   { value: "responsavel", label: "Só o responsável pelo ticket" },
   { value: "fila", label: "Grupo/Fila (escolha o grupo)" },
+  { value: "usuario", label: "Usuário específico (escolha o atendente)" },
   { value: "contato_whatsapp", label: "Contato do ticket (WhatsApp)" },
 ];
 
@@ -1183,6 +1184,8 @@ export default function QuadroModal({
   const [kanbanLembretes, setKanbanLembretes] = useState([]);
   const [kanbanLembretesLoading, setKanbanLembretesLoading] = useState(false);
   const [lembreteEditorOpen, setLembreteEditorOpen] = useState(false);
+  const [companyUsersList, setCompanyUsersList] = useState([]);
+  const [lembreteUsuarioQueueFilter, setLembreteUsuarioQueueFilter] = useState("");
   const [lembreteForm, setLembreteForm] = useState({
     id: null,
     nome: "",
@@ -1216,6 +1219,16 @@ export default function QuadroModal({
   const [dealNegocioExtraFields, setDealNegocioExtraFields] = useState([]);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
+
+  useEffect(() => {
+    if (!lembreteEditorOpen) return;
+    let cancelled = false;
+    api.get("/users/").then(({ data }) => {
+      const list = data?.users || data || [];
+      if (!cancelled && Array.isArray(list)) setCompanyUsersList(list);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [lembreteEditorOpen]);
   const savedValuesRef = useRef({ valorServico: 0, valorEntrada: 0, nomeProjeto: "", dataPrazo: "", processoDetalhesItens: [], customFields: [], description: "", contactFormData: { ...DEFAULT_CONTACT_FORM_STATE }, dealNegocioExtraFields: [] });
 
   const dirtyValores = useMemo(() => {
@@ -2393,6 +2406,7 @@ export default function QuadroModal({
         destinoId = "";
       }
     }
+    // destinoTipo "usuario" mantém destinoId como veio (id do user)
     const diasRaw = row.diasAntecedencia != null ? Number(row.diasAntecedencia) : 1;
     const diasAntecedencia = Number.isFinite(diasRaw) && diasRaw >= 0 ? diasRaw : 1;
     setLembreteForm({
@@ -2441,6 +2455,14 @@ export default function QuadroModal({
       toast.error("Selecione uma fila válida ou altere o destino do lembrete.");
       return;
     }
+    const destinoUsuarioId =
+      destinoTipoNorm === "usuario" && lembreteForm.destinoId
+        ? parseInt(String(lembreteForm.destinoId), 10)
+        : null;
+    if (destinoTipoNorm === "usuario" && !destinoUsuarioId) {
+      toast.error("Selecione um usuário válido ou altere o destino do lembrete.");
+      return;
+    }
     const body = {
       nome,
       descricao: (lembreteForm.descricao || "").trim() || null,
@@ -2450,7 +2472,9 @@ export default function QuadroModal({
       destinoId:
         destinoTipoNorm === "fila" && destinoFilaId
           ? parseInt(String(destinoFilaId), 10)
-          : null,
+          : destinoTipoNorm === "usuario" && destinoUsuarioId
+            ? destinoUsuarioId
+            : null,
       diasAntecedencia:
         tipoGatilhoNorm === "prazo_proximo" && lembreteForm.diasAntecedencia != null
           ? Number(lembreteForm.diasAntecedencia)
@@ -4115,7 +4139,9 @@ export default function QuadroModal({
                             destinoId:
                               next === "fila"
                                 ? pickValidDestinoFilaId(f.destinoId, queues)
-                                : "",
+                                : next === "usuario"
+                                  ? f.destinoId
+                                  : "",
                           }));
                         }}
                       >
@@ -4128,7 +4154,7 @@ export default function QuadroModal({
                     </FormControl>
                     {lembreteForm.destinoTipo === "fila" && (
                       <FormControl fullWidth margin="dense" variant="outlined" size="small">
-                        <InputLabel>Grupo/Fila</InputLabel>
+                        <InputLabel shrink style={{ background: theme.palette.type === "dark" ? theme.palette.background.default : theme.palette.grey[50], padding: "0 4px" }}>Grupo/Fila</InputLabel>
                         <Select
                           label="Grupo/Fila"
                           displayEmpty
@@ -4150,6 +4176,55 @@ export default function QuadroModal({
                           ))}
                         </Select>
                       </FormControl>
+                    )}
+                    {lembreteForm.destinoTipo === "usuario" && (
+                      <>
+                        <FormControl fullWidth margin="dense" variant="outlined" size="small">
+                          <InputLabel shrink style={{ background: theme.palette.type === "dark" ? theme.palette.background.default : theme.palette.grey[50], padding: "0 4px" }}>Filtrar por grupo/fila</InputLabel>
+                          <Select
+                            label="Filtrar por grupo/fila"
+                            displayEmpty
+                            value={lembreteUsuarioQueueFilter}
+                            onChange={(e) => setLembreteUsuarioQueueFilter(e.target.value)}
+                          >
+                            <MenuItem value=""><em>Todos os grupos</em></MenuItem>
+                            {(user?.queues || []).map((queue) => (
+                              <MenuItem key={queue.id} value={String(queue.id)}>
+                                {queue.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormControl fullWidth margin="dense" variant="outlined" size="small">
+                          <InputLabel shrink style={{ background: theme.palette.type === "dark" ? theme.palette.background.default : theme.palette.grey[50], padding: "0 4px" }}>Usuário</InputLabel>
+                          <Select
+                            label="Usuário"
+                            displayEmpty
+                            value={lembreteForm.destinoId ? String(lembreteForm.destinoId) : ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLembreteForm((f) => ({ ...f, destinoId: v }));
+                            }}
+                          >
+                            <MenuItem value="">
+                              <em>
+                                {companyUsersList.length ? "Selecione o usuário" : "Carregando usuários..."}
+                              </em>
+                            </MenuItem>
+                            {companyUsersList
+                              .filter((u) => {
+                                if (!lembreteUsuarioQueueFilter) return true;
+                                const qs = Array.isArray(u.queues) ? u.queues : [];
+                                return qs.some((q) => String(q.id) === String(lembreteUsuarioQueueFilter));
+                              })
+                              .map((u) => (
+                                <MenuItem key={u.id} value={String(u.id)}>
+                                  {u.name}{u.email ? ` (${u.email})` : ""}
+                                </MenuItem>
+                              ))}
+                          </Select>
+                        </FormControl>
+                      </>
                     )}
                     <FormControlLabel
                       control={
