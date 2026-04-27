@@ -497,7 +497,7 @@ const TicketListItemCustom = ({ setTabOpen, ticket, allowDragToTagFolder }) => {
 
     const lastMessagePreview = () => {
         const lm = ticket.lastMessage;
-        if (!lm) {
+        if (!lm?.trim()) {
             return (
                 <span style={{ opacity: 0.65, fontStyle: "italic" }}>
                     {i18n.t("ticketsList.noMessages")}

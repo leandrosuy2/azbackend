@@ -999,6 +999,7 @@ const messages = {
         noTicketsTitle: "Nada aqui!",
         noTicketsMessage:
           "Nenhum atendimento encontrado com esse status ou termo pesquisado",
+        noMessages: "Sem mensagens",
         noQueue: "Sem Fila",
         buttons: {
           accept: "Aceitar",
