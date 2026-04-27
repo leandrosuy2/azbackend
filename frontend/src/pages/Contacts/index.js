@@ -33,6 +33,7 @@ import EditIcon from "@material-ui/icons/Edit";
 import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import CancelIcon from "@material-ui/icons/Cancel";
 import BlockIcon from "@material-ui/icons/Block";
+import WarningRoundedIcon from "@material-ui/icons/WarningRounded";
 
 import api from "../../services/api";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
@@ -59,7 +60,7 @@ import {
     ContactPhone,
     DeleteSweep,
 } from "@material-ui/icons";
-import { Menu, MenuItem, Box, Checkbox } from "@material-ui/core";
+import { Menu, MenuItem, Box, Checkbox, Tooltip } from "@material-ui/core";
 
 import ContactImportWpModal from "../../components/ContactImportWpModal";
 import useCompanySettings from "../../hooks/useSettings/companySettings";
@@ -68,60 +69,60 @@ import { TicketsContext } from "../../context/Tickets/TicketsContext";
 // Phone number validation and formatting functions
 const isValidBrazilianPhoneNumber = (number) => {
   if (!number) return false;
-  
+
   // Remove all non-numeric characters
   const cleanNumber = number.replace(/\D/g, '');
-  
+
   // Check if the number is empty or too short
   if (!cleanNumber || cleanNumber.length < 10) return false;
-  
+
   // Brazilian numbers typically have 10-11 digits (with area code)
   // DDD (area code) in Brazil is 2 digits (11-99)
   if (cleanNumber.length > 13) return false;
-  
+
   // Check if starts with country code 55 (Brazil) or has valid area code
   const hasBrazilCountryCode = cleanNumber.startsWith('55');
   const numberWithoutCountryCode = hasBrazilCountryCode ? cleanNumber.slice(2) : cleanNumber;
-  
+
   // Extract area code (DDD)
   const areaCode = numberWithoutCountryCode.slice(0, 2);
-  
+
   // Validate the area code (Brazilian DDDs range from 11 to 99)
   const areaCodeNum = parseInt(areaCode, 10);
   if (areaCodeNum < 11 || areaCodeNum > 99) return false;
-  
+
   // Check the length of the remaining phone number
   const phoneNumberWithoutAreaCode = numberWithoutCountryCode.slice(2);
-  
+
   // Brazilian mobile numbers have 9 digits, landlines have 8
   const isValidLength = phoneNumberWithoutAreaCode.length === 8 || phoneNumberWithoutAreaCode.length === 9;
-  
+
   // Mobile numbers in Brazil start with 9
   const isMobileValid = phoneNumberWithoutAreaCode.length === 9 && phoneNumberWithoutAreaCode.startsWith('9');
-  
+
   // Landline numbers should have 8 digits
   const isLandlineValid = phoneNumberWithoutAreaCode.length === 8;
-  
+
   return isValidLength && (isMobileValid || isLandlineValid);
 };
 
 // Function to format the Brazilian phone number for display
 const formatBrazilianPhoneNumber = (number) => {
   if (!isValidBrazilianPhoneNumber(number)) return null;
-  
+
   // Remove all non-numeric characters
   const cleanNumber = number.replace(/\D/g, '');
-  
+
   // Handle numbers with country code
   const hasBrazilCountryCode = cleanNumber.startsWith('55');
   const numberWithoutCountryCode = hasBrazilCountryCode ? cleanNumber.slice(2) : cleanNumber;
-  
+
   // Get area code
   const areaCode = numberWithoutCountryCode.slice(0, 2);
-  
+
   // Get the phone part
   const phoneNumber = numberWithoutCountryCode.slice(2);
-  
+
   // Format based on mobile (9 digits) or landline (8 digits)
   if (phoneNumber.length === 9) {
     // Mobile format: (XX) 9XXXX-XXXX
@@ -136,18 +137,18 @@ const formatBrazilianPhoneNumber = (number) => {
 const formatPhoneNumber = (number, isGroup, shouldHide = false, userProfile = "") => {
   // Handle group numbers differently
   if (isGroup) return number;
-  
+
   // Check if it's a valid Brazilian phone number
   const isValidBrNumber = isValidBrazilianPhoneNumber(number);
-  
+
   // If not valid, return null instead of a warning message
   if (!isValidBrNumber) return null;
-  
+
   // If LGPD is enabled and number should be hidden for user profile
   if (shouldHide && userProfile === "user") {
     const formattedNumber = formatBrazilianPhoneNumber(number);
     if (!formattedNumber) return null;
-    
+
     // Ensure proper masking of the phone number
     const parts = formattedNumber.split(' ');
     if (parts.length >= 3) {
@@ -157,7 +158,7 @@ const formatPhoneNumber = (number, isGroup, shouldHide = false, userProfile = ""
     }
     return formattedNumber;
   }
-  
+
   // Return properly formatted Brazilian phone number
   return formatBrazilianPhoneNumber(number) || null;
 };
@@ -171,53 +172,66 @@ const groupLongDigitsForDisplay = (d) => {
   return chunks ? chunks.join(" ") : d;
 };
 
-/**
- * Nome na lista: o backend às vezes grava o mesmo ID/LID no campo name.
- * Não repetir esse valor como "nome"; mostrar rótulo claro + sufixo para distinguir linhas.
- */
 const displayContactNameForList = (contact) => {
   const visible = (contact.name || "").trim();
-  const numD = digitsOnlyStr(contact.number);
-  if (!visible) {
-    return numD.length >= 4
-      ? i18n.t("contacts.table.nameEmptyHint", { suffix: numD.slice(-4) })
-      : i18n.t("contacts.table.unnamed");
-  }
-  const nameD = digitsOnlyStr(visible);
+  if (!visible) return i18n.t("contacts.table.unnamed");
   const onlyDigits = /^\d+$/.test(visible.replace(/\s/g, ""));
-  if (onlyDigits) {
-    if (nameD === numD) {
-      return i18n.t("contacts.table.displayNameSameAsNumber", {
-        suffix: numD.slice(-4),
-      });
-    }
-    if (nameD.length >= 10) {
-      return i18n.t("contacts.table.displayNameNumericId", {
-        suffix: nameD.slice(-4),
-      });
-    }
-  }
+  if (onlyDigits) return i18n.t("contacts.table.unnamed");
   return visible;
 };
 
-/** Lista: sempre mostrar número; BR formatado quando possível, senão internacional simples. */
-const displayContactNumberForList = (raw, isGroup, shouldHide, userProfile) => {
-  if (isGroup) return raw || "—";
-  if (raw == null || raw === "") return "—";
+/** Retorna tooltip descritivo se o contato está sem nome e/ou sem número real. */
+const getMissingFieldsWarning = (contact, isLid) => {
+  const noName = !contact.name || /^\d+$/.test((contact.name || "").replace(/\s/g, ""));
+  const noNumber = isLid || !contact.number || digitsOnlyStr(contact.number).length < 8;
+  if (noName && noNumber) return "Sem nome e sem número de telefone cadastrados";
+  if (noName) return "Sem nome cadastrado";
+  if (noNumber) return "Sem número de telefone cadastrado";
+  return null;
+};
+
+/**
+ * Retorna true se o número armazenado parece ser um LID do WhatsApp (ID interno,
+ * não um número de telefone real). Critérios espelhados de resolveContactWhatsAppPhone.js.
+ */
+const isLidNumber = (stored, remoteJid) => {
+  if (/@lid$/i.test(remoteJid || "")) return true;
+  // Fallback: número ainda não migrado (LID salvo como dígitos antes da correção do backend)
+  if (!stored) return false;
+  const s = String(stored);
+  if (s.length >= 14 && s.length <= 16 && /^1\d+$/.test(s)) return true;
+  return false;
+};
+
+/**
+ * Retorna { display, title } para a célula de número.
+ * display: texto curto para exibir; title: tooltip (undefined se igual ao display).
+ */
+const displayContactNumberForList = (raw, isGroup, shouldHide, userProfile, remoteJid) => {
+  if (isGroup) return { display: raw || "—", title: undefined };
+  if (raw == null || raw === "") return { display: "—", title: undefined };
   const jid = String(raw).split("@")[0];
-  const br = formatPhoneNumber(jid, false, shouldHide, userProfile);
-  if (br) return br;
   const d = jid.replace(/\D/g, "");
-  if (!d) return jid;
+
+  // LID: ID interno do WhatsApp, não é telefone real
+  if (isLidNumber(d, remoteJid)) {
+    return {
+      display: "—",
+      title: i18n.t("contacts.table.lidNumber", { defaultValue: "Número não disponível (ID interno WhatsApp)" }),
+    };
+  }
+
+  const br = formatPhoneNumber(jid, false, shouldHide, userProfile);
+  if (br) return { display: br, title: undefined };
+  if (!d) return { display: jid, title: undefined };
   if (shouldHide && userProfile === "user" && d.length >= 4) {
-    return `•••• ${d.slice(-4)}`;
+    return { display: `•••• ${d.slice(-4)}`, title: undefined };
   }
   const grouped = groupLongDigitsForDisplay(d);
-  if (grouped) {
-    return `+${grouped}`;
-  }
-  if (jid.trim().startsWith("+")) return jid;
-  return d.length >= 8 ? `+${d}` : jid;
+  if (grouped) return { display: `+${grouped}`, title: undefined };
+  if (jid.trim().startsWith("+")) return { display: jid, title: undefined };
+  const text = d.length >= 8 ? `+${d}` : jid;
+  return { display: text, title: undefined };
 };
 
 const reducer = (state, action) => {
@@ -365,10 +379,10 @@ const Contacts = () => {
             const settingList = await getAllSettings(user.companyId);
 
             for (const [key, value] of Object.entries(settingList)) {
-                
+
                 if (key === "enableLGPD") setEnableLGPD(value === "enabled");
                 if (key === "lgpdHideNumber") setHideNum(value === "enabled");
-                
+
               }
         }
         fetchData();
@@ -983,11 +997,12 @@ const Contacts = () => {
                     <TableBody>
                         <>
                             {contacts.map((contact) => {
-                                const displayNumber = displayContactNumberForList(
+                                const { display: displayNumber, title: displayNumberTitle } = displayContactNumberForList(
                                     contact.number,
                                     contact.isGroup,
                                     enableLGPD && hideNum,
-                                    user.profile
+                                    user.profile,
+                                    contact.remoteJid
                                 );
                                 const rawName = (contact.name || "").trim();
                                 const displayName = displayContactNameForList(contact);
@@ -995,6 +1010,7 @@ const Contacts = () => {
                                 const fullNumberTitle = contact.isGroup
                                     ? contact.number
                                     : digitsOnlyStr(contact.number);
+                                const missingWarning = getMissingFieldsWarning(contact, displayNumberTitle != null);
                                 return (
                                     <TableRow key={contact.id}>
                                         <TableCell
@@ -1024,16 +1040,19 @@ const Contacts = () => {
                                                 <Avatar src={`${contact?.urlPicture}`} />
                                             </Box>
                                         </TableCell>
-                                        <TableCell
-                                            title={
-                                                rawName && rawName !== displayName
-                                                    ? rawName
-                                                    : undefined
-                                            }
-                                        >
-                                            {displayName}
+                                        <TableCell>
+                                            <Box display="flex" alignItems="center" style={{ gap: 6 }}>
+                                                {displayName}
+                                                {missingWarning && (
+                                                    <Tooltip title={missingWarning} arrow>
+                                                        <WarningRoundedIcon
+                                                            style={{ fontSize: 16, color: "#f59e0b", flexShrink: 0 }}
+                                                        />
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
                                         </TableCell>
-                                        <TableCell align="center" title={fullNumberTitle || undefined}>
+                                        <TableCell align="center" title={displayNumberTitle || fullNumberTitle || undefined}>
                                             {displayNumber}
                                         </TableCell>
                                         <TableCell align="center">

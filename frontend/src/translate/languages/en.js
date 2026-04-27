@@ -401,6 +401,7 @@ const messages = {
 			nameEmptyHint: "No name (ends {{suffix}})",
 			displayNameSameAsNumber: "No name (duplicate ID ···{{suffix}})",
 			displayNameNumericId: "No name (internal ID ···{{suffix}})",
+			lidNumber: "Number unavailable (WhatsApp internal ID)",
 		  },
 		  menu: {
 			importYourPhone: "Import from default device",
