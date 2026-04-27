@@ -329,8 +329,11 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         setDrawerOpen(true);
       }
     }
-    if (user.defaultTheme === "dark" && theme.mode === "light") {
-      colorMode.toggleColorMode();
+    // Só aplica o tema padrão do servidor se o usuário nunca tiver salvo preferência própria
+    if (!window.localStorage.getItem("preferredTheme")) {
+      if (user.defaultTheme === "dark" && theme.mode === "light") {
+        colorMode.toggleColorMode();
+      }
     }
   }, [user.defaultMenu, document.body.offsetWidth]);
 

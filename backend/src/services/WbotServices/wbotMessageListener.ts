@@ -866,15 +866,24 @@ const verifyContact = async (
   companyId: number
 ): Promise<Contact> => {
   let profilePicUrl: string = "";
-  // try {
-  //   profilePicUrl = await wbot.profilePictureUrl(msgContact.id, "image");
-  // } catch (e) {
-  //   Sentry.captureException(e);
-  //   profilePicUrl = `${process.env.FRONTEND_URL}/nopicture.png`;
-  // }
+
+  // pushName vem vazio em algumas mensagens (comum com @lid). Tenta o store interno do Baileys.
+  let resolvedName = msgContact.name || "";
+  if (!resolvedName) {
+    try {
+      const storeContact = (wbot as any).store?.contacts?.[msgContact.id];
+      resolvedName =
+        storeContact?.notify ||
+        storeContact?.name ||
+        storeContact?.verifiedName ||
+        "";
+    } catch {
+      /* store indisponível */
+    }
+  }
 
   const contactData = {
-    name: msgContact.name || msgContact.id.replace(/\D/g, ""),
+    name: resolvedName || msgContact.id.replace(/\D/g, ""),
     number: msgContact.id.replace(/\D/g, ""),
     profilePicUrl,
     isGroup: msgContact.id.includes("g.us"),

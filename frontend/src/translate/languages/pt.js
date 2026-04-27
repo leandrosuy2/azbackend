@@ -410,6 +410,7 @@ const messages = {
           nameEmptyHint: "Sem nome (final {{suffix}})",
           displayNameSameAsNumber: "Sem nome (ID repetido ···{{suffix}})",
           displayNameNumericId: "Sem nome (ID interno ···{{suffix}})",
+          lidNumber: "Número não disponível (ID interno WhatsApp)",
         },
         menu: {
           importYourPhone: "Importar do aparelho padrão",

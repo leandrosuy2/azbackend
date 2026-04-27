@@ -15,7 +15,15 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Box,
+  Typography,
+  Collapse,
+  IconButton,
 } from "@material-ui/core";
+import Alert from "@material-ui/lab/Alert";
+import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
+import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import ExpandLessIcon from "@material-ui/icons/ExpandLess";
 import api from "../../services/api";
 import upload from "../../assets/upload.gif";
 import { useHistory } from "react-router-dom";
@@ -80,6 +88,93 @@ const useStyles = makeStyles((theme) => ({
     marginTop: 20,
   },
 }));
+
+const ImportGuide = () => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Box mb={2}>
+      <Alert
+        severity="info"
+        icon={<InfoOutlinedIcon />}
+        action={
+          <IconButton size="small" onClick={() => setExpanded(v => !v)}>
+            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        }
+      >
+        <strong>Como importar contatos corretamente</strong>
+        {" — "}clique para {expanded ? "fechar" : "ver o guia"}
+      </Alert>
+      <Collapse in={expanded}>
+        <Box
+          p={2}
+          mt={0}
+          style={{
+            border: "1px solid #90caf9",
+            borderTop: "none",
+            borderRadius: "0 0 4px 4px",
+            background: "#f5faff",
+          }}
+        >
+          <Typography variant="subtitle2" gutterBottom style={{ fontWeight: 700 }}>
+            📋 Formato obrigatório da planilha
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            Sua planilha deve ter pelo menos as colunas <strong>Nome</strong> e <strong>Número</strong>.
+            Após carregar o arquivo, mapeie cada coluna ao campo correspondente usando os seletores.
+          </Typography>
+
+          <Box mt={1} mb={1} style={{ overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%", maxWidth: 480 }}>
+              <thead>
+                <tr style={{ background: "#1976d2", color: "#fff" }}>
+                  <th style={{ padding: "6px 12px", textAlign: "left" }}>Nome</th>
+                  <th style={{ padding: "6px 12px", textAlign: "left" }}>Número</th>
+                  <th style={{ padding: "6px 12px", textAlign: "left" }}>E-mail (opcional)</th>
+                  <th style={{ padding: "6px 12px", textAlign: "left" }}>Tags (opcional)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ background: "#fff" }}>
+                  <td style={{ padding: "5px 12px", borderBottom: "1px solid #e0e0e0" }}>João Silva</td>
+                  <td style={{ padding: "5px 12px", borderBottom: "1px solid #e0e0e0" }}>5511987654321</td>
+                  <td style={{ padding: "5px 12px", borderBottom: "1px solid #e0e0e0" }}>joao@email.com</td>
+                  <td style={{ padding: "5px 12px", borderBottom: "1px solid #e0e0e0" }}>cliente, vip</td>
+                </tr>
+                <tr style={{ background: "#f9f9f9" }}>
+                  <td style={{ padding: "5px 12px" }}>Maria Santos</td>
+                  <td style={{ padding: "5px 12px" }}>5521996543210</td>
+                  <td style={{ padding: "5px 12px" }}>maria@email.com</td>
+                  <td style={{ padding: "5px 12px" }}>lead</td>
+                </tr>
+              </tbody>
+            </table>
+          </Box>
+
+          <Typography variant="subtitle2" gutterBottom style={{ fontWeight: 700, marginTop: 12 }}>
+            📞 Formato do número
+          </Typography>
+          <Typography variant="body2" component="div">
+            <ul style={{ margin: "4px 0", paddingLeft: 20 }}>
+              <li>Somente dígitos, sem espaços, traços ou parênteses</li>
+              <li>Incluir DDI + DDD: <strong>55</strong> (Brasil) + <strong>11</strong> (SP) + número</li>
+              <li>Celular BR: <code>5511987654321</code> (13 dígitos com o 9)</li>
+              <li>Fixo BR: <code>551133334444</code> (12 dígitos)</li>
+            </ul>
+          </Typography>
+
+          <Alert severity="warning" style={{ marginTop: 12 }}>
+            <strong>Atenção:</strong> Esta é a única forma de importar contatos com número de telefone garantido.
+            A importação pelo dispositivo (agenda do WhatsApp) pode criar contatos sem número visível
+            quando o WhatsApp usa ID interno (<em>LID</em>) — especialmente em contatos que nunca foram
+            salvos na agenda do celular.
+          </Alert>
+        </Box>
+      </Collapse>
+    </Box>
+  );
+};
 
 const ContactImport = () => {
   const size = useWindowDimensions();
@@ -391,7 +486,8 @@ const ContactImport = () => {
   });
 
   return (
-    <div style={{ alignContent: "center" }}>
+    <div style={{ alignContent: "center", padding: "0 12px" }}>
+      <ImportGuide />
       {imported && (
         <div>
           <ul>

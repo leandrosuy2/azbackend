@@ -95,40 +95,53 @@ const ContactImportWpModal = ({ isOpen, handleClose, selectedTags, hideNum, user
     }
   }, [contactsToImport]);
 
+  const isLidNumber = (stored, remoteJid) => {
+    if (/@lid$/i.test(remoteJid || "")) return true;
+    if (!stored) return false;
+    const s = String(stored);
+    if (s.length >= 14 && s.length <= 16 && /^1\d+$/.test(s)) return true;
+    return false;
+  };
+
   const handleOnExportContacts = async (model = false) => {
-    const allDatas = []; //const { data } = await api.get("/contacts");
+    const allDatas = [];
 
     let i = 1;
     if (!model) {
       while (i !== 0) {
         const { data } = await api.get("/contacts/", {
-          params: { searchParam: "", pageNumber: i, contactTag: JSON.stringify(selectedTags) },
+          params: { searchParam: "", pageNumber: i, limit: 100, contactTag: JSON.stringify(selectedTags) },
         });
-        console.log(data)
         data.contacts.forEach((element) => {
-          const tagsContact = element?.tags?.map(tag => tag?.name).join(', '); // Concatenando as tags com vírgula
-          const contactWithTags = { ...element, tags: tagsContact }; // Substituindo as tags pelo valor concatenado
-          allDatas.push(contactWithTags);
+          const tagsContact = element?.tags?.map(tag => tag?.name).join(', ');
+          allDatas.push({ ...element, tags: tagsContact });
         });
 
-        const pages = data?.count / 20;
+        const pages = Math.ceil(data?.count / 100);
         i++;
-        if (i > pages) {
-          i = 0;
-        }
+        if (i > pages) i = 0;
       }
     } else {
-      allDatas.push({
-        name: "João",
-        number: "5599999999999",
-        email: "",
-      });
+      allDatas.push({ name: "João", number: "5599999999999", email: "" });
     }
 
     const exportData = allDatas.map((e) => {
-      return { name: e.name, number: (hideNum && userProfile === "user" ? e.isGroup ? e.number : e.number.slice(0, -6) + "**-**" + e.number.slice(-2) : e.number), email: e.email, tags: e.tags };
+      const rawNum = String(e.number || "").replace(/\D/g, "");
+      const lid = isLidNumber(rawNum, e.remoteJid);
+      const rawName = (e.name || "").trim();
+      const nameIsDigits = /^\d+$/.test(rawName.replace(/\s/g, ""));
+      const nome = (!rawName || nameIsDigits) ? "" : rawName;
+      const numero = lid ? "" : rawNum;
+      const lidVal = lid ? String(e.number || "") : "";
+      return {
+        Nome: nome,
+        Numero: numero,
+        Email: e.email || "",
+        Tags: e.tags || "",
+        LID: lidVal,
+      };
     });
-    //console.log({ allDatas });
+
     let wb = XLSX.utils.book_new();
     let ws = XLSX.utils.json_to_sheet(exportData);
     XLSX.utils.book_append_sheet(wb, ws, "Contatos");

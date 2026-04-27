@@ -112,6 +112,11 @@ const resolveNumberAndJidForStorage = async (
     }
   }
 
+  // LID não resolvido: salvar number vazio em vez do ID interno do WhatsApp
+  if (!isGroup && storeRemoteJid.includes("@lid") && number === rawDigits) {
+    number = "";
+  }
+
   return { number, storeRemoteJid, rawDigits };
 };
 
@@ -210,6 +215,10 @@ const CreateOrUpdateContactService = async ({
       }
       if (!isGroup && number && contact.number !== number) {
         contact.number = number;
+      }
+      // Limpa número LID que já estava salvo no banco
+      if (!isGroup && !number && rawDigits && contact.number === rawDigits) {
+        contact.number = "";
       }
       if (typeof profilePicUrl !== "undefined") {
         contact.profilePicUrl = profilePicUrl || null;

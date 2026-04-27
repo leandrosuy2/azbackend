@@ -19,12 +19,14 @@ import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import Switch from "@material-ui/core/Switch";
 
+import Alert from "@material-ui/lab/Alert";
 import { i18n } from "../../translate/i18n";
 
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { TagsContainer } from "../TagsContainer";
 import { digitsOnly, formatPhoneBr, formatDocumentBr } from "../../utils/brazilContactFormat";
+import { resolveContactWhatsAppPhone } from "../../utils/resolveContactWhatsAppPhone";
 
 /** Normaliza para comparação (ex.: com/sem 55). */
 function normalizePhoneDigitsForMatch(d) {
@@ -140,6 +142,7 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave }) => {
 	};
 
 	const [contact, setContact] = useState(initialState);
+	const [isLidContact, setIsLidContact] = useState(false);
 	const [disableBot, setDisableBot] = useState(false);
 	useEffect(() => {
 		return () => {
@@ -160,7 +163,12 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave }) => {
 			try {
 				const { data } = await api.get(`/contacts/${contactId}`);
 				if (isMounted.current) {
-					setContact(data);
+					// Se número for LID (ID interno WhatsApp, não telefone real), limpa o campo
+					// para o usuário preencher o telefone correto.
+					const resolved = resolveContactWhatsAppPhone(data);
+					const numberForForm = resolved.isInternalId ? "" : (resolved.copyText || data.number || "");
+					setIsLidContact(resolved.isInternalId);
+					setContact({ ...data, number: numberForForm });
 					setDisableBot(data.disableBot)
 				}
 			} catch (err) {
@@ -174,6 +182,7 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave }) => {
 	const handleClose = () => {
 		onClose();
 		setContact(initialState);
+		setIsLidContact(false);
 	};
 
 	const handleSaveContact = async values => {
@@ -250,6 +259,12 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave }) => {
 									margin="dense"
 									variant="outlined"
 								/>
+								{isLidContact && (
+									<Alert severity="warning" style={{ marginBottom: 4 }}>
+										Este contato usa ID interno do WhatsApp e não possui número de telefone cadastrado.
+										Preencha o número abaixo para habilitar envio de mensagens.
+									</Alert>
+								)}
 								<Field name="number">
 									{({ field, form }) => (
 										<TextField
