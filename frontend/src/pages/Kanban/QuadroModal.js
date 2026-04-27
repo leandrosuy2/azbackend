@@ -1212,6 +1212,96 @@ export default function QuadroModal({
   const [lembreteHistoricoId, setLembreteHistoricoId] = useState(null);
   const [lembreteDisparos, setLembreteDisparos] = useState([]);
   const [lembreteDisparosLoading, setLembreteDisparosLoading] = useState(false);
+  const [contactFormData, setContactFormData] = useState(() => ({ ...DEFAULT_CONTACT_FORM_STATE }));
+  const [dealNegocioExtraFields, setDealNegocioExtraFields] = useState([]);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
+  const savedValuesRef = useRef({ valorServico: 0, valorEntrada: 0, nomeProjeto: "", dataPrazo: "", processoDetalhesItens: [], customFields: [], description: "", contactFormData: { ...DEFAULT_CONTACT_FORM_STATE }, dealNegocioExtraFields: [] });
+
+  const dirtyValores = useMemo(() => {
+    if (readOnly || !ticket) return false;
+    const s = savedValuesRef.current;
+    if (valorServico !== s.valorServico) return true;
+    if (valorEntrada !== s.valorEntrada) return true;
+    if (nomeProjeto !== s.nomeProjeto) return true;
+    if (dataPrazo !== s.dataPrazo) return true;
+    if (JSON.stringify(processoDetalhesItens) !== JSON.stringify(s.processoDetalhesItens)) return true;
+    const cfFiltered = filterQuadroCustomFieldsForUi(customFields).filter((f) => (f.name || "").trim());
+    const cfSaved = filterQuadroCustomFieldsForUi(s.customFields).filter((f) => (f.name || "").trim());
+    if (JSON.stringify(cfFiltered) !== JSON.stringify(cfSaved)) return true;
+    return false;
+  }, [readOnly, ticket, valorServico, valorEntrada, nomeProjeto, dataPrazo, processoDetalhesItens, customFields]);
+
+  const dirtyDescription = useMemo(() => {
+    if (readOnly || !ticket) return false;
+    return editMode && description !== savedValuesRef.current.description;
+  }, [readOnly, ticket, editMode, description]);
+
+  const dirtyTitulo = useMemo(() => {
+    if (readOnly || !ticket) return false;
+    return editingTituloCard && (nomeProjetoDraft || "").trim() !== (nomeProjeto || "").trim();
+  }, [readOnly, ticket, editingTituloCard, nomeProjetoDraft, nomeProjeto]);
+
+  const dirtyContact = useMemo(() => {
+    if (readOnly || !ticket) return false;
+    const s = savedValuesRef.current.contactFormData || {};
+    const cur = contactFormData || {};
+    const fields = ["name","email","cpf","cnpj","country","city","state","leadOrigin","deliveryDate","dealValue","company","position","observation"];
+    for (const f of fields) {
+      if ((cur[f] || "") !== (s[f] || "")) return true;
+    }
+    if (JSON.stringify(cur.products || []) !== JSON.stringify(s.products || [])) return true;
+    const sNeg = (savedValuesRef.current.dealNegocioExtraFields || []).map(({ label, value }) => ({ label: label || "", value: value || "" }));
+    const cNeg = (dealNegocioExtraFields || []).map(({ label, value }) => ({ label: label || "", value: value || "" }));
+    if (JSON.stringify(sNeg) !== JSON.stringify(cNeg)) return true;
+    return false;
+  }, [readOnly, ticket, contactFormData, dealNegocioExtraFields]);
+
+  const hasUnsavedChanges = dirtyValores || dirtyDescription || dirtyContact || dirtyTitulo;
+
+  const handleRequestClose = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setConfirmCloseOpen(true);
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
+
+  const handleSaveRef = useRef(null);
+  const handleSaveValoresRef = useRef(null);
+  const handleSaveContactRef = useRef(null);
+  const handleSaveTituloRef = useRef(null);
+  const dirtyValoresRef = useRef(false);
+  const dirtyDescriptionRef = useRef(false);
+  const dirtyContactRef = useRef(false);
+  const dirtyTituloRef = useRef(false);
+  useEffect(() => { dirtyValoresRef.current = dirtyValores; }, [dirtyValores]);
+  useEffect(() => { dirtyDescriptionRef.current = dirtyDescription; }, [dirtyDescription]);
+  useEffect(() => { dirtyContactRef.current = dirtyContact; }, [dirtyContact]);
+  useEffect(() => { dirtyTituloRef.current = dirtyTitulo; }, [dirtyTitulo]);
+
+  const handleSaveDirtyAndClose = useCallback(async () => {
+    setSavingAll(true);
+    try {
+      if (dirtyTituloRef.current && handleSaveTituloRef.current) {
+        await handleSaveTituloRef.current();
+      }
+      if (dirtyDescriptionRef.current && handleSaveRef.current) {
+        await handleSaveRef.current();
+      }
+      if (dirtyValoresRef.current && handleSaveValoresRef.current) {
+        await handleSaveValoresRef.current();
+      }
+      if (dirtyContactRef.current && handleSaveContactRef.current) {
+        await handleSaveContactRef.current();
+      }
+      setConfirmCloseOpen(false);
+      onClose();
+    } finally {
+      setSavingAll(false);
+    }
+  }, [onClose]);
+
   const lembretesAtivosCount = React.useMemo(
     () => (kanbanLembretes || []).filter((l) => l.ativo !== false).length,
     [kanbanLembretes]
@@ -1271,10 +1361,6 @@ export default function QuadroModal({
     lightboxListRef.current = lightboxList;
   }, [lightboxList]);
 
-  // Estado dos dados do contato (mesmos campos do ContactDrawer)
-  const [contactFormData, setContactFormData] = useState(() => ({ ...DEFAULT_CONTACT_FORM_STATE }));
-  /** Campos extras nome/valor na seção Negócio (persistidos em extraInfo JSON) */
-  const [dealNegocioExtraFields, setDealNegocioExtraFields] = useState([]);
   const [contactFormSaving, setContactFormSaving] = useState(false);
   const [resolvedQuadroGroupName, setResolvedQuadroGroupName] = useState(null);
 
@@ -1428,7 +1514,7 @@ export default function QuadroModal({
       }
       setDealNegocioExtraFields(extrasNegocio);
 
-           setContactFormData({
+      const loadedContact = {
         name: resolvedName,
         email: contact.email || "",
         cpf: getExtraInfoValue(extra, "cpf") || "",
@@ -1447,7 +1533,13 @@ export default function QuadroModal({
         productInput: "",
         products: productsRaw ? productsRaw.split(",").map((p) => p.trim()).filter(Boolean) : [],
         observation: getExtraInfoValue(extra, "observacao") || "",
-      });
+      };
+      setContactFormData(loadedContact);
+      savedValuesRef.current = {
+        ...savedValuesRef.current,
+        contactFormData: loadedContact,
+        dealNegocioExtraFields: extrasNegocio.map(({ id, label, value }) => ({ id, label, value })),
+      };
     }
     /* Cartão livre: formulário vem do snapshot em loadAll (`__quadro_contact_snapshot`), não limpar aqui. */
   }, [ticket]);
@@ -1519,9 +1611,16 @@ export default function QuadroModal({
             ? { ...prev, contact: { ...prev.contact, ...savedContact, extraInfo: savedContact.extraInfo || extraInfo } }
             : prev
         );
+        savedValuesRef.current = {
+          ...savedValuesRef.current,
+          contactFormData: { ...contactFormData },
+          dealNegocioExtraFields: dealNegocioExtraFields.map(({ id, label, value }) => ({ id, label, value })),
+        };
         toast.success("Dados do contato salvos com sucesso!");
       } catch (err) {
         toast.error(err?.response?.data?.message || "Erro ao salvar dados do contato.");
+        setContactFormSaving(false);
+        throw err;
       }
       setContactFormSaving(false);
       return;
@@ -1565,14 +1664,24 @@ export default function QuadroModal({
         })),
         ...quadroViewContext(),
       });
-      setCustomFields(merged.map((f) => ({ name: f.name || "", value: f.value || "", type: f.type || "text" })));
+      const mergedCustomFields = merged.map((f) => ({ name: f.name || "", value: f.value || "", type: f.type || "text" }));
+      setCustomFields(mergedCustomFields);
+      savedValuesRef.current = {
+        ...savedValuesRef.current,
+        contactFormData: { ...contactFormData },
+        dealNegocioExtraFields: dealNegocioExtraFields.map(({ id, label, value }) => ({ id, label, value })),
+        customFields: mergedCustomFields,
+      };
       toast.success("Dados salvos no cartão. Vincule um contato para copiar isto ao cadastro do cliente.");
       if (typeof onQuadroUpdated === "function") onQuadroUpdated();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Erro ao salvar dados no cartão.");
+      setContactFormSaving(false);
+      throw err;
     }
     setContactFormSaving(false);
   };
+  handleSaveContactRef.current = handleSaveAllContactFields;
 
   const handleContactAddProduct = () => {
     const product = contactFormData.productInput.trim();
@@ -1693,26 +1802,38 @@ export default function QuadroModal({
         setDataPrazo(
           dp && String(dp).length >= 10 ? String(dp).slice(0, 10) : dp ? String(dp) : ""
         );
-        setProcessoDetalhesItens(normalizeProcessoDetalhesItensFromQuadro(quadroData.quadro));
+        const loadedProcessoItens = normalizeProcessoDetalhesItensFromQuadro(quadroData.quadro);
+        setProcessoDetalhesItens(loadedProcessoItens);
         const cf = quadroData.quadro.customFields;
         const mapped = Array.isArray(cf)
           ? cf.map((f) => ({ name: f.name || "", value: f.value || "", type: f.type || "text" }))
           : [];
         /* Estado completo (incl. «Telefone (manual)» e snapshot interno); o editor de extras só mostra o filtrado. */
         setCustomFields(mapped);
+        savedValuesRef.current = {
+          ...savedValuesRef.current,
+          valorServico: Number(quadroData.quadro.valorServico) || 0,
+          valorEntrada: Number(quadroData.quadro.valorEntrada) || 0,
+          nomeProjeto: quadroCardTitleRaw || "",
+          dataPrazo: (() => { const dp = quadroData.quadro.dataPrazo; return dp && String(dp).length >= 10 ? String(dp).slice(0, 10) : dp ? String(dp) : ""; })(),
+          processoDetalhesItens: loadedProcessoItens,
+          customFields: mapped,
+        };
 
         const ticketMerged = isStandalone
           ? { ...ticketWithQuadroTitle, isStandaloneQuadro: true }
           : { ...ticketWithQuadroTitle };
         const cardTitleForForm = (quadroCardTitleRaw || "").trim();
         if (!hasRealLinkedContactFromTicket(ticketMerged)) {
+          let loadedContact = null;
+          let loadedNegocio = [];
           const snapRow = mapped.find((f) => isInternalQuadroContactSnapshotField(f?.name));
           if (snapRow?.value) {
             try {
               const snap = JSON.parse(String(snapRow.value));
               if (snap.contactFormData && typeof snap.contactFormData === "object") {
                 const snapName = (snap.contactFormData.name || "").trim();
-                setContactFormData({
+                loadedContact = {
                   ...DEFAULT_CONTACT_FORM_STATE,
                   ...snap.contactFormData,
                   name: snapName || cardTitleForForm,
@@ -1720,38 +1841,41 @@ export default function QuadroModal({
                   products: Array.isArray(snap.contactFormData.products)
                     ? snap.contactFormData.products
                     : DEFAULT_CONTACT_FORM_STATE.products,
-                });
+                };
               } else {
-                setContactFormData({
+                loadedContact = {
                   ...DEFAULT_CONTACT_FORM_STATE,
                   ...(cardTitleForForm ? { name: cardTitleForForm } : {}),
-                });
+                };
               }
               if (Array.isArray(snap.dealNegocioExtraFields)) {
-                setDealNegocioExtraFields(
-                  snap.dealNegocioExtraFields.map((row, idx) => ({
-                    id: row.id || `neg_${idx}_${String(row.label || "").slice(0, 8)}`,
-                    label: String(row.label || ""),
-                    value: String(row.value || ""),
-                  }))
-                );
-              } else {
-                setDealNegocioExtraFields([]);
+                loadedNegocio = snap.dealNegocioExtraFields.map((row, idx) => ({
+                  id: row.id || `neg_${idx}_${String(row.label || "").slice(0, 8)}`,
+                  label: String(row.label || ""),
+                  value: String(row.value || ""),
+                }));
               }
             } catch {
-              setContactFormData({
+              loadedContact = {
                 ...DEFAULT_CONTACT_FORM_STATE,
                 ...(cardTitleForForm ? { name: cardTitleForForm } : {}),
-              });
-              setDealNegocioExtraFields([]);
+              };
+              loadedNegocio = [];
             }
           } else {
-            setContactFormData({
+            loadedContact = {
               ...DEFAULT_CONTACT_FORM_STATE,
               ...(cardTitleForForm ? { name: cardTitleForForm } : {}),
-            });
-            setDealNegocioExtraFields([]);
+            };
+            loadedNegocio = [];
           }
+          setContactFormData(loadedContact);
+          setDealNegocioExtraFields(loadedNegocio);
+          savedValuesRef.current = {
+            ...savedValuesRef.current,
+            contactFormData: loadedContact,
+            dealNegocioExtraFields: loadedNegocio.map(({ id, label, value }) => ({ id, label, value })),
+          };
         }
       } else {
         setValorServico(0);
@@ -1762,6 +1886,11 @@ export default function QuadroModal({
         if (isStandalone && ticketData && !hasRealLinkedContactFromTicket({ ...ticketData, isStandaloneQuadro: true })) {
           setContactFormData({ ...DEFAULT_CONTACT_FORM_STATE });
           setDealNegocioExtraFields([]);
+          savedValuesRef.current = {
+            ...savedValuesRef.current,
+            contactFormData: { ...DEFAULT_CONTACT_FORM_STATE },
+            dealNegocioExtraFields: [],
+          };
         }
       }
       if (Array.isArray(quadroData.attachments)) {
@@ -1783,6 +1912,7 @@ export default function QuadroModal({
         setStatus("aguardando");
       }
       setDescription(quadroDescription || "");
+      savedValuesRef.current = { ...savedValuesRef.current, description: quadroDescription || "" };
       setAttachments(quadroAttachments);
       const capaAttachment = quadroAttachments.find((a) => a.isCapa);
       if (capaAttachment?.url) {
@@ -1869,7 +1999,8 @@ export default function QuadroModal({
     }
     setLoading(true);
     loadAll();
-  }, [open, ticketUuid, loadAll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, ticketUuid]);
 
   const handleAtualizar = () => {
     setRefreshing(true);
@@ -1897,11 +2028,14 @@ export default function QuadroModal({
         description: newDescription,
         ...quadroViewContext(),
       });
+      savedValuesRef.current = { ...savedValuesRef.current, description: newDescription };
       toast.success("Descrição salva.");
     } catch (err) {
       toast.error(err?.response?.data?.message || "Erro ao salvar descrição.");
+      throw err;
     }
   };
+  handleSaveRef.current = handleSave;
 
   const handleDiscard = () => {
     setDescription(descriptionBackup);
@@ -2472,12 +2606,22 @@ export default function QuadroModal({
       };
       await api.put("/tickets/" + quadroApiUuid + "/quadro", payload);
       toast.success("Cartão, detalhes do processo e campos salvos.");
-      await loadAll();
+      savedValuesRef.current = {
+        ...savedValuesRef.current,
+        valorServico,
+        valorEntrada,
+        nomeProjeto: nomeProjeto || "",
+        dataPrazo: (dataPrazo || "").trim() || "",
+        processoDetalhesItens: itensPayload,
+        customFields: filterQuadroCustomFieldsForUi(customFields).filter((f) => (f.name || "").trim()).map((f) => ({ name: (f.name || "").trim(), value: (f.value || "").trim(), type: f.type || "text" })),
+      };
       if (typeof onQuadroUpdated === "function") onQuadroUpdated();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Erro ao salvar.");
+      throw err;
     }
   };
+  handleSaveValoresRef.current = handleSaveValores;
 
   const addProcessoDetalheItem = () => {
     const item = newProcessoDetalheItem();
@@ -2632,12 +2776,15 @@ export default function QuadroModal({
       });
       setNomeProjeto(trimmed);
       setEditingTituloCard(false);
+      savedValuesRef.current = { ...savedValuesRef.current, nomeProjeto: trimmed };
       toast.success("Nome do cartão atualizado.");
       if (typeof onQuadroUpdated === "function") onQuadroUpdated();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Erro ao salvar o nome do cartão.");
+      throw err;
     }
   };
+  handleSaveTituloRef.current = handleSaveTituloCard;
 
   const persistManualPhoneToQuadro = async () => {
     if (!quadroApiUuid || readOnly || !isStandaloneQuadro) return;
@@ -2716,7 +2863,7 @@ export default function QuadroModal({
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleRequestClose}
       className={classes.dialog}
       maxWidth={false}
       fullScreen={fullScreen}
@@ -2839,7 +2986,7 @@ export default function QuadroModal({
                       </Button>
                     </Tooltip>
                   )}
-                  <IconButton onClick={onClose} size="small" aria-label="Fechar">
+                  <IconButton onClick={handleRequestClose} size="small" aria-label="Fechar">
                     <Close />
                   </IconButton>
                 </Box>
@@ -2922,7 +3069,6 @@ export default function QuadroModal({
                               setStatus(saved);
                               ensureStatusInOptions(saved, setStatusOptions);
                               toast.success("Status do quadro atualizado.");
-                              await loadAll();
                               if (typeof onQuadroUpdated === "function") onQuadroUpdated();
                             } catch (err) {
                               setStatus(previous);
@@ -4997,6 +5143,33 @@ export default function QuadroModal({
           </Button>
         </StatusDialogActions>
       </StatusDialog>
+
+      <Dialog open={confirmCloseOpen} onClose={() => !savingAll && setConfirmCloseOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Alterações não salvas</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" gutterBottom>
+            Existem alterações não salvas:
+          </Typography>
+          <ul style={{ marginTop: 4, marginBottom: 8 }}>
+            {dirtyTitulo && <li><Typography variant="body2">Título do cartão</Typography></li>}
+            {dirtyDescription && <li><Typography variant="body2">Descrição</Typography></li>}
+            {dirtyValores && <li><Typography variant="body2">Valores / detalhes do processo / campos extras</Typography></li>}
+            {dirtyContact && <li><Typography variant="body2">Dados do contato</Typography></li>}
+          </ul>
+          <Typography variant="body2" color="textSecondary">
+            Deseja salvar antes de fechar?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={savingAll} onClick={() => setConfirmCloseOpen(false)}>Continuar editando</Button>
+          <Button disabled={savingAll} color="secondary" onClick={() => { setConfirmCloseOpen(false); onClose(); }}>
+            Descartar e fechar
+          </Button>
+          <Button disabled={savingAll} variant="contained" color="primary" onClick={handleSaveDirtyAndClose}>
+            {savingAll ? "Salvando..." : "Salvar e fechar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }
