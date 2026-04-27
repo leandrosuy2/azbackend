@@ -151,7 +151,14 @@ export default function Options(props) {
   const [showNotificationPending, setShowNotificationPending] = useState(false);
   const [loadingShowNotificationPending, setLoadingShowNotificationPending] = useState(false);
 
+  const [downloadLimit, setDownloadLimit] = useState("15");
+  const [loadingDownloadLimit, setLoadingDownloadLimit] = useState(false);
+
+  const [downloadLimitMessage, setDownloadLimitMessage] = useState("");
+  const [loadingDownloadLimitMessage, setLoadingDownloadLimitMessage] = useState(false);
+
   const { update: updateUserCreation, getAll } = useSettings();
+  const settingsHook = useSettings();
 
   const { update } = useCompanySettings();
 
@@ -169,6 +176,12 @@ export default function Options(props) {
       if (userPar) {
         setUserCreation(userPar.value);
       }
+
+      const dlPar = oldSettings.find((s) => s.key === "downloadLimit");
+      if (dlPar) setDownloadLimit(dlPar.value);
+
+      const dlMsgPar = oldSettings.find((s) => s.key === "downloadLimitMessage");
+      if (dlMsgPar) setDownloadLimitMessage(dlMsgPar.value);
     }
   }, [oldSettings])
 
@@ -458,6 +471,20 @@ export default function Options(props) {
       data: value,
     });
     setLoadingRequiredTag(false);
+  }
+
+  async function handleDownloadLimit(value) {
+    setDownloadLimit(value);
+    setLoadingDownloadLimit(true);
+    await settingsHook.update({ key: "downloadLimit", value });
+    setLoadingDownloadLimit(false);
+  }
+
+  async function handleDownloadLimitMessage(value) {
+    setDownloadLimitMessage(value);
+    setLoadingDownloadLimitMessage(true);
+    await settingsHook.update({ key: "downloadLimitMessage", value });
+    setLoadingDownloadLimitMessage(false);
   }
 
   async function handleCloseTicketOnTransfer(value) {
@@ -1126,8 +1153,50 @@ export default function Options(props) {
           </FormControl>
         </Grid>
 
-        
-              
+        <Grid xs={12} sm={6} md={3} item>
+          <FormControl className={classes.selectContainer}>
+            <TextField
+              id="downloadLimit"
+              name="downloadLimit"
+              margin="dense"
+              label="Limite de download (MiB)"
+              variant="outlined"
+              type="number"
+              inputProps={{ min: 1 }}
+              value={downloadLimit}
+              onChange={async (e) => {
+                handleDownloadLimit(e.target.value);
+              }}
+            />
+            <FormHelperText>
+              {loadingDownloadLimit && i18n.t("settings.settings.options.updating")}
+            </FormHelperText>
+          </FormControl>
+        </Grid>
+
+        <Grid xs={12} sm={6} md={9} item>
+          <FormControl className={classes.selectContainer}>
+            <TextField
+              id="downloadLimitMessage"
+              name="downloadLimitMessage"
+              margin="dense"
+              multiline
+              rows={3}
+              label="Mensagem automática de arquivo grande"
+              variant="outlined"
+              value={downloadLimitMessage}
+              onChange={async (e) => {
+                handleDownloadLimitMessage(e.target.value);
+              }}
+            />
+            <FormHelperText>
+              {loadingDownloadLimitMessage
+                ? i18n.t("settings.settings.options.updating")
+                : `Padrão: "Nosso sistema aceita apenas arquivos com no máximo ${downloadLimit} MiB"`}
+            </FormHelperText>
+          </FormControl>
+        </Grid>
+
       </Grid>
     </>
   );
