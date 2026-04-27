@@ -753,21 +753,25 @@ const downloadMedia = async (
   if (!message) {
     return null;
   }
-  const fileLimit = parseInt(await CheckSettings1("downloadLimit", "15"), 10);
+  const companyId = ticket.companyId;
+  const fileLimit = parseInt(await CheckCompanySetting(companyId, "downloadLimit", "15"), 10);
   if (
     wbot &&
     message?.fileLength &&
     +message.fileLength > fileLimit * 1024 * 1024
   ) {
+    const customMsg = await CheckCompanySetting(companyId, "downloadLimitMessage", "");
+    const msgText = customMsg.trim()
+      ? customMsg.trim()
+      : `Nosso sistema aceita apenas arquivos com no máximo ${fileLimit} MiB`;
     const fileLimitMessage = {
-      text: `\u200e*Mensagem Automática*:\nNosso sistema aceita apenas arquivos com no máximo ${fileLimit} MiB`,
+      text: `\u200e*Mensagem Automática*:\n${msgText}`,
     };
     const sendMsg = await wbot.sendMessage(
       `${ticket.contact.number}@${"s.whatsapp.net"}`,
       fileLimitMessage
     );
-    sendMsg.message.extendedTextMessage.text =
-      "\u200e*Mensagem do sistema*:\nArquivo recebido além do limite de tamanho do sistema, se for necessário ele pode ser obtido no aplicativo do whatsapp.";
+    sendMsg.message.extendedTextMessage.text = `\u200e*Mensagem Automática*:\n${msgText}`;
     // eslint-disable-next-line no-use-before-define
     await verifyMessage(sendMsg, ticket, ticket.contact);
     throw new Error("ERR_FILESIZE_OVER_LIMIT");
