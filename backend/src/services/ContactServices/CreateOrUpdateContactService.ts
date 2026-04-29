@@ -214,7 +214,20 @@ const CreateOrUpdateContactService = async ({
         contact.remoteJid = jidNormalizedUser(storeRemoteJid);
       }
       if (!isGroup && number && contact.number !== number) {
-        contact.number = number;
+        const conflict = await Contact.findOne({
+          where: {
+            number,
+            companyId,
+            id: { [Op.ne]: contact.id }
+          }
+        });
+        if (conflict) {
+          logger.warn(
+            `Skip number update on contact ${contact.id}: number ${number} already used by contact ${conflict.id} (companyId=${companyId})`
+          );
+        } else {
+          contact.number = number;
+        }
       }
       // Limpa número LID que já estava salvo no banco
       if (!isGroup && !number && rawDigits && contact.number === rawDigits) {
@@ -269,7 +282,7 @@ const CreateOrUpdateContactService = async ({
     } else if (wbot && ['whatsapp'].includes(channel)) {
       // Criação de novo contato
       const settings = await CompaniesSettings.findOne({ where: { companyId } });
-      const { acceptAudioMessageContact } = settings;
+      const acceptAudioMessageContact = settings?.acceptAudioMessageContact;
       let newRemoteJid = storeRemoteJid || remoteJid;
 
       if (!newRemoteJid) {
