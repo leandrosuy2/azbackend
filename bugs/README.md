@@ -123,3 +123,8 @@ Formato de cada entrada:
 2. Faz o fix + commit
 3. Adiciona entrada aqui neste arquivo seguindo o formato acima
 4. Abre PR para `main`
+
+
+
+Lembretes nao funcionam como deve!
+testar criar um lembrete.

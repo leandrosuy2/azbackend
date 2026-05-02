@@ -1,0 +1,31 @@
+Aguardando conexão para iniciar a importação de mensagens:
+    Whatsapp nome: RF Personalizados
+    Whatsapp Id: 20
+    Criação do arquivo de logs: 02/05/2026 13:44:07
+    Selecionado Data de inicio de importação: 25/04/2026 16:32:00 
+    Selecionado Data final da importação: 26/04/2026 16:31:00 
+     
+
+Mensagem 1 de 8
+               
+
+Mensagem 2 de 8
+               
+
+Mensagem 3 de 8
+               
+
+Mensagem 4 de 8
+               
+
+Mensagem 5 de 8
+               
+
+Mensagem 6 de 8
+               
+
+Mensagem 7 de 8
+               
+
+Mensagem 8 de 8
+               

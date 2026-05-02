@@ -71,7 +71,7 @@ deploy_frontend() {
   cd "$PROJECT_DIR/frontend"
 
   log "Instalando dependências..."
-  npm install --silent
+  #npm install --silent
 
   log "Buildando React..."
   rm -rf build
