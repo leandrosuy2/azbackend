@@ -20,7 +20,7 @@ import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
 import CreateMessageService from "../services/MessageServices/CreateMessageService";
 import Ticket from "../models/Ticket";
-import { sendFacebookMessageMedia } from "../services/FacebookServices/sendFacebookMessageMedia";
+import { sendFacebookMessageMedia, typeAttachment } from "../services/FacebookServices/sendFacebookMessageMedia";
 import sendFaceMessage from "../services/FacebookServices/sendFacebookMessage";
 
 import ShowPlanCompanyService from "../services/CompanyService/ShowPlanCompanyService";
@@ -34,7 +34,7 @@ import UpdateTicketService from "../services/TicketServices/UpdateTicketService"
 import ListSettingsService from "../services/SettingServices/ListSettingsService";
 import ShowMessageService, { GetWhatsAppFromMessage } from "../services/MessageServices/ShowMessageService";
 import CompaniesSettings from "../models/CompaniesSettings";
-import { verifyMessageFace, verifyMessageMedia } from "../services/FacebookServices/facebookMessageListener";
+import { verifyMessageFace } from "../services/FacebookServices/facebookMessageListener";
 import EditWhatsAppMessage from "../services/MessageServices/EditWhatsAppMessage";
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import { Op } from "sequelize";
@@ -67,6 +67,42 @@ type MessageData = {
   number?: string;
   isPrivate?: string;
   vCard?: Contact;
+};
+
+const getMetaMessageId = (sentMessage: any): string | null =>
+  sentMessage?.message_id || sentMessage?.mid || sentMessage?.id || null;
+
+const createOutgoingMetaMediaMessage = async ({
+  sentMessage,
+  media,
+  body,
+  ticket
+}: {
+  sentMessage: any;
+  media: Express.Multer.File;
+  body?: string;
+  ticket: Ticket;
+}) => {
+  const wid =
+    getMetaMessageId(sentMessage) ||
+    `${ticket.channel}-${ticket.id}-${Date.now()}-${media.filename}`;
+
+  const messageData = {
+    wid,
+    ticketId: ticket.id,
+    contactId: undefined,
+    body: body || media.filename,
+    fromMe: true,
+    mediaType: typeAttachment(media),
+    mediaUrl: media.filename,
+    read: true,
+    quotedMsgId: null,
+    ack: 3,
+    dataJson: JSON.stringify(sentMessage || {}),
+    channel: ticket.channel
+  };
+
+  await CreateMessageService({ messageData, companyId: ticket.companyId });
 };
 export const addReaction = async (req: Request, res: Response): Promise<Response> => {
   try {
@@ -204,9 +240,12 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
                 body: Array.isArray(body) ? body[index] : body
               });
 
-              if (ticket.channel === "facebook") {
-                await verifyMessageMedia(sentMedia, ticket, ticket.contact, true);
-              }
+              await createOutgoingMetaMediaMessage({
+                sentMessage: sentMedia,
+                media,
+                body: Array.isArray(body) ? body[index] : body,
+                ticket
+              });
             } catch (error) {
               console.log(error);
             }
@@ -216,7 +255,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
           const filePath = path.resolve("public", `company${companyId}`, media.filename);
           const fileExists = fs.existsSync(filePath);
 
-          if (fileExists && isPrivate === "false") {
+          if (ticket.channel === "whatsapp" && fileExists && isPrivate === "false") {
             fs.unlinkSync(filePath);
           }
         })
@@ -247,9 +286,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       } else if (["facebook", "instagram"].includes(ticket.channel)) {
         const sendText = await sendFaceMessage({ body, ticket, quotedMsg });
 
-        if (ticket.channel === "facebook") {
-          await verifyMessageFace(sendText, body, ticket, ticket.contact, true);
-        }
+        await verifyMessageFace(sendText, body, ticket, ticket.contact, true);
       }
     }
     return res.send();

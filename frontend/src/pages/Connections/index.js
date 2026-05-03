@@ -35,6 +35,7 @@ import {
   DeleteOutline,
   Facebook,
   Instagram,
+  Sync,
   WhatsApp,
 } from "@material-ui/icons";
 
@@ -87,6 +88,17 @@ const useStyles = makeStyles((theme) => ({
     color: green[500],
   },
 }));
+
+const facebookAppId = process.env.REACT_APP_FACEBOOK_APP_ID;
+const facebookApiVersion = process.env.REACT_APP_FACEBOOK_API_VERSION || "25.0";
+const requireBusinessManagement =
+  process.env.REACT_APP_REQUIRE_BUSINESS_MANAGEMENT?.toUpperCase() === "TRUE";
+const facebookScope = requireBusinessManagement
+  ? "public_profile,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement,business_management"
+  : "public_profile,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement";
+const instagramScope = requireBusinessManagement
+  ? "public_profile,instagram_basic,instagram_manage_messages,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement,business_management"
+  : "public_profile,instagram_basic,instagram_manage_messages,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement";
 
 function CircularProgressWithLabel(props) {
   return (
@@ -168,6 +180,7 @@ const Connections = () => {
   };
   const [confirmModalInfo, setConfirmModalInfo] = useState(confirmationModalInitialState);
   const [planConfig, setPlanConfig] = useState(false);
+  const [syncingInstagramId, setSyncingInstagramId] = useState(null);
 
   //   const socketManager = useContext(SocketContext);
   const { user, socket } = useContext(AuthContext);
@@ -186,6 +199,11 @@ const Connections = () => {
   }, []);
 
   const responseFacebook = (response) => {
+    if (!facebookAppId) {
+      toast.error("Configure REACT_APP_FACEBOOK_APP_ID no frontend dev.");
+      return;
+    }
+
     if (response.status !== "unknown") {
       const { accessToken, id } = response;
 
@@ -204,6 +222,11 @@ const Connections = () => {
   };
 
   const responseInstagram = (response) => {
+    if (!facebookAppId) {
+      toast.error("Configure REACT_APP_FACEBOOK_APP_ID no frontend dev.");
+      return;
+    }
+
     if (response.status !== "unknown") {
       const { accessToken, id } = response;
 
@@ -234,9 +257,22 @@ const Connections = () => {
       }
     });
 
-    /* return () => {
-      socket.disconnect();
-    }; */
+    const onInstagramSync = (data) => {
+      if (data.status === "done") {
+        setSyncingInstagramId(null);
+        toast.success(
+          `Instagram sincronizado: ${data.messages || 0} mensagens em ${data.conversations || 0} conversa(s).`
+        );
+      } else if (data.status === "error") {
+        setSyncingInstagramId(null);
+        toast.error(`Falha ao sincronizar Instagram: ${data.message || "erro desconhecido"}`);
+      }
+    };
+    socket.on(`company-${user.companyId}-instagramSync`, onInstagramSync);
+
+    return () => {
+      socket.off(`company-${user.companyId}-instagramSync`, onInstagramSync);
+    };
   }, [whatsApps]);
 
   const handleStartWhatsAppSession = async (whatsAppId) => {
@@ -522,6 +558,17 @@ const Connections = () => {
     }
   }
 
+  const handleSyncInstagramDms = async (whatsAppId) => {
+    try {
+      setSyncingInstagramId(whatsAppId);
+      await api.post(`/instagram/${whatsAppId}/sync-dms`);
+      toast.info("Sincronização iniciada. Pode continuar usando a plataforma — vamos avisar quando terminar.");
+    } catch (err) {
+      setSyncingInstagramId(null);
+      toastError(err);
+    }
+  };
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -601,13 +648,11 @@ const Connections = () => {
                             </MenuItem>
                             {/* FACEBOOK */}
                             <FacebookLogin
-                              appId={process.env.REACT_APP_FACEBOOK_APP_ID}
+                              appId={facebookAppId}
                               autoLoad={false}
                               fields="name,email,picture"
-                              version="9.0"
-                              scope={process.env.REACT_APP_REQUIRE_BUSINESS_MANAGEMENT?.toUpperCase() === "TRUE" ?
-                                "public_profile,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement,business_management"
-                                : "public_profile,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement"}
+                              version={facebookApiVersion}
+                              scope={facebookScope}
                               callback={responseFacebook}
                               render={(renderProps) => (
                                 <MenuItem
@@ -627,13 +672,11 @@ const Connections = () => {
                             />
                             {/* INSTAGRAM */}
                             <FacebookLogin
-                              appId={process.env.REACT_APP_FACEBOOK_APP_ID}
+                              appId={facebookAppId}
                               autoLoad={false}
                               fields="name,email,picture"
-                              version="9.0"
-                              scope={process.env.REACT_APP_REQUIRE_BUSINESS_MANAGEMENT?.toUpperCase() === "TRUE" ?
-                                "public_profile,instagram_basic,instagram_manage_messages,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement,business_management"
-                                : "public_profile,instagram_basic,instagram_manage_messages,pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement"}
+                              version={facebookApiVersion}
+                              scope={instagramScope}
                               callback={responseInstagram}
                               render={(renderProps) => (
                                 <MenuItem
@@ -746,6 +789,33 @@ const Connections = () => {
                             perform="connections-page:addConnection"
                             yes={() => (
                               <TableCell align="center">
+                                {whatsApp.channel === "instagram" && (
+                                  <Tooltip
+                                    title="Sincronizar DMs do Instagram (importa conversas e mensagens recentes da API)"
+                                    arrow
+                                  >
+                                    <span>
+                                      <Button
+                                        size="small"
+                                        variant="contained"
+                                        color="primary"
+                                        disabled={syncingInstagramId === whatsApp.id}
+                                        onClick={() => handleSyncInstagramDms(whatsApp.id)}
+                                        startIcon={
+                                          syncingInstagramId === whatsApp.id ? (
+                                            <CircularProgress size={14} style={{ color: "#fff" }} />
+                                          ) : (
+                                            <Sync />
+                                          )
+                                        }
+                                        style={{ marginRight: 8, textTransform: "none" }}
+                                      >
+                                        {syncingInstagramId === whatsApp.id ? "Sincronizando..." : "Sincronizar DMs"}
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
+                                )}
+
                                 <IconButton
                                   size="small"
                                   onClick={() => handleEditWhatsApp(whatsApp)}

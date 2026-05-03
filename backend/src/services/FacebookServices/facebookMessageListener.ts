@@ -90,10 +90,16 @@ export interface ReplyTo {
 const verifyContact = async (msgContact: any, token: any, companyId: any) => {
   if (!msgContact) return null;
 
+  const contactName =
+    msgContact?.name ||
+    msgContact?.username ||
+    [msgContact?.first_name, msgContact?.last_name].filter(Boolean).join(" ") ||
+    msgContact.id;
+
   const contactData = {
-    name: msgContact?.name || `${msgContact?.first_name} ${msgContact?.last_name}`,
+    name: contactName,
     number: msgContact.id,
-    profilePicUrl: msgContact.profile_pic,
+    profilePicUrl: msgContact.profile_pic || msgContact.profile_picture_url,
     isGroup: false,
     companyId: companyId,
     channel: token.channel,

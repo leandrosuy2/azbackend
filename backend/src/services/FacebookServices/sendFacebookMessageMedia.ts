@@ -1,4 +1,3 @@
-import fs from "fs";
 import AppError from "../../errors/AppError";
 import Ticket from "../../models/Ticket";
 import { sendAttachmentFromUrl } from "./graphAPI";
@@ -44,8 +43,6 @@ export const sendFacebookMessageMedia = async ({
     );
 
     await ticket.update({ lastMessage: media.filename });
-
-    fs.unlinkSync(media.path);
 
     return sendMessage;
   } catch (err) {

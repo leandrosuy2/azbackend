@@ -25,8 +25,15 @@ const sendFacebookMessage = async ({ body, ticket, quotedMsg }: Request): Promis
     return send;
 
   } catch (err) {
-    console.log(err)
-    throw new AppError("ERR_SENDING_FACEBOOK_MSG");
+    const fbError = err?.response?.data?.error;
+    console.error("[sendFacebookMessage]", {
+      ticketId: ticket.id,
+      channel: ticket.channel,
+      recipient: number,
+      fbError
+    });
+    const detail = fbError?.message || err?.message || "unknown";
+    throw new AppError(`ERR_SENDING_FACEBOOK_MSG: ${detail}`);
   }
 };
 

@@ -35,6 +35,12 @@ Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const app = express();
 
+const rawBodySaver = (req: Request, _: Response, buf: Buffer) => {
+  if (buf && buf.length) {
+    (req as any).rawBody = buf.toString("utf8");
+  }
+};
+
 // Configuração de filas
 app.set("queues", {
   messageQueue,
@@ -69,7 +75,7 @@ if (String(process.env.BULL_BOARD).toLocaleLowerCase() === 'true' && process.env
 // }));
 
 app.use(compression()); // Compressão HTTP
-app.use(bodyParser.json({ limit: '5mb' })); // Aumentar o limite de carga para 5 MB
+app.use(bodyParser.json({ limit: '5mb', verify: rawBodySaver })); // Aumentar o limite de carga para 5 MB
 app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
 app.use(
   cors({

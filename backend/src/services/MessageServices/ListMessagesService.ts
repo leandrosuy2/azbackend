@@ -102,20 +102,29 @@ const ListMessagesService = async ({
 
   let ticketIds: Ticket[] = [];
   if (!isAllHistoricEnabled) {
+    const adminLike =
+      user.profile === "admin" ||
+      user.allTicket === "enable" ||
+      (ticket.isGroup && user.allowGroup);
+
+    const baseWhere: any = {
+      id: { [Op.lte]: ticket.id },
+      companyId: ticket.companyId,
+      contactId: ticket.contactId,
+      whatsappId: ticket.whatsappId,
+      isGroup: ticket.isGroup
+    };
+
+    if (adminLike) {
+      if (queues && queues.length > 0) {
+        baseWhere.queueId = { [Op.or]: [queues, null] };
+      }
+    } else {
+      baseWhere.queueId = { [Op.in]: queues };
+    }
+
     ticketIds = await Ticket.findAll({
-      where: {
-        id: { [Op.lte]: ticket.id },
-        companyId: ticket.companyId,
-        contactId: ticket.contactId,
-        whatsappId: ticket.whatsappId,
-        isGroup: ticket.isGroup,
-        queueId:
-          user.profile === "admin" || user.allTicket === "enable" || (ticket.isGroup && user.allowGroup)
-            ? {
-                [Op.or]: [queues, null]
-              }
-            : { [Op.in]: queues }
-      },
+      where: baseWhere,
       attributes: ["id"]
     });
   } else {

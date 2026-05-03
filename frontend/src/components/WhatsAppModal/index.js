@@ -350,7 +350,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
 
 
 
-    if (NPSEnabled) {
+    const isMetaChannel = ["facebook", "instagram"].includes(values.channel);
+
+    if (NPSEnabled && !isMetaChannel) {
 
       if (isNil(values.ratingMessage)) {
         toastError(i18n.t("whatsappModal.errorRatingMessage"));

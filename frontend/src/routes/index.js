@@ -52,6 +52,7 @@ import ResetPassword from "../pages/ResetPassword";
 import Tutoriais from "../pages/Tutoriais";
 import Quadro from "../pages/Quadro";
 import PublicOrcamentoPage from "../pages/PublicOrcamentoPage";
+import { PrivacyPolicy, TermsOfService, MetaCallback, DataDeletion } from "../pages/PublicLegal";
 
 
 const Routes = () => {
@@ -70,6 +71,11 @@ const Routes = () => {
         <TicketsContextProvider>
           <Switch>
             <RouterRoute exact path="/orcamento/:token" component={PublicOrcamentoPage} />
+            <RouterRoute exact path="/privacy" component={PrivacyPolicy} />
+            <RouterRoute exact path="/terms" component={TermsOfService} />
+            <RouterRoute exact path="/delete" component={DataDeletion} />
+            <RouterRoute exact path="/facebook/callback" component={MetaCallback} />
+            <RouterRoute exact path="/instagram/callback" component={MetaCallback} />
             <Route exact path="/login" component={Login} />
             <Route exact path="/signup" component={Signup} />
             <Route exact path="/forgot-password" component={ForgotPassword} />

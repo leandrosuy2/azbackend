@@ -1,6 +1,7 @@
 node_modules
 dist
 .env
+.env.vps-dev
 yarn.lock
 yarn-error.log
 
@@ -15,3 +16,5 @@ docs/SINCRONIZAR-BANCO-PRODUCAO-PARA-LOCAL.md
 azvdodesigner_dump.sql
 public/company*
 public/announcements
+postgres_data*
+postgres18_data*
