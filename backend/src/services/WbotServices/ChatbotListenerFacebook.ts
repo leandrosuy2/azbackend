@@ -10,6 +10,7 @@ import ShowChatBotByChatbotIdServices from "../ChatBotServices/ShowChatBotByChat
 import CreateDialogChatBotsServices from "../DialogChatBotsServices/CreateDialogChatBotsServices";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import formatBody from "../../helpers/Mustache";
+import hasVisibleText from "../../helpers/HasVisibleText";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import Chatbot from "../../models/Chatbot";
 import User from "../../models/User";
@@ -50,9 +51,12 @@ const sendMessage = async (
   ticket: Ticket,
   body: string
 ) => {
+  const formattedBody = formatBody(body, ticket);
+  if (!hasVisibleText(formattedBody)) return;
+
   const sentMessage = await sendText(
     contact.number,
-    formatBody(body, ticket),
+    formattedBody,
     ticket.whatsapp.facebookUserToken
   );
 };
@@ -89,9 +93,12 @@ const sendDialog = async (
     }
 
     const body = `\u200e${choosenQueue.greetingMessage}`;
+    const formattedBody = formatBody(body, ticket);
+    if (!hasVisibleText(formattedBody)) return;
+
     const send = await sendText(
       contact.number,
-      formatBody(body, ticket),
+      formattedBody,
       ticket.whatsapp.facebookUserToken
     );
     return send;
@@ -119,9 +126,12 @@ const sendDialog = async (
   }
 
   const body = `\u200e${choosenQueue.greetingMessage}`;
+  const formattedBody = formatBody(body, ticket);
+  if (!hasVisibleText(formattedBody)) return;
+
   const send = await sendText(
     contact.number,
-    formatBody(body, ticket),
+    formattedBody,
     ticket.whatsapp.facebookUserToken
   );
   return send;

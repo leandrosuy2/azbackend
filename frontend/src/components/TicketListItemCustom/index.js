@@ -446,12 +446,13 @@ const TicketListItemCustom = ({ setTabOpen, ticket, allowDragToTagFolder }) => {
             toastError(err);
         }
 
-        const msg = `${setting.greetingAcceptedMessage}`;
+        const msg = `${setting?.greetingAcceptedMessage ?? ""}`.trim();
+        if (!msg) return;
         const message = {
             read: 1,
             fromMe: true,
             mediaUrl: "",
-            body: `${msg.trim()}`,
+            body: msg,
         };
         try {
             await api.post(`/messages/${id}`, message);

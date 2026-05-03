@@ -17,6 +17,7 @@ import ShowChatBotByChatbotIdServices from "../ChatBotServices/ShowChatBotByChat
 import CreateDialogChatBotsServices from "../DialogChatBotsServices/CreateDialogChatBotsServices";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import formatBody from "../../helpers/Mustache";
+import hasVisibleText from "../../helpers/HasVisibleText";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import Chatbot from "../../models/Chatbot";
 import User from "../../models/User";
@@ -64,10 +65,13 @@ const sendMessage = async (
   ticket: Ticket,
   body: string
 ) => {
+  const formattedBody = formatBody(body, ticket);
+  if (!hasVisibleText(formattedBody)) return;
+
   const sentMessage = await wbot.sendMessage(
     `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
     {
-      text: formatBody(body, ticket),
+      text: formattedBody,
     }
   );
   await verifyMessage(sentMessage, ticket, contact);
@@ -342,8 +346,9 @@ const sendDialog = async (
       });
 
       if (buttons.length > 0) {
+        const formattedText = formatBody(`\u200e${choosenQueue.greetingMessage}`, ticket);
         const buttonMessage = {
-          text: `\u200e${choosenQueue.greetingMessage}`,
+          text: hasVisibleText(formattedText) ? formattedText : "Escolha uma opção",
           buttons,
           headerType: 1,
         };
@@ -381,8 +386,9 @@ const sendDialog = async (
           },
         ];
 
+        const formattedText = formatBody(`\u200e${choosenQueue.greetingMessage}`, ticket);
         const listMessage = {
-          text: formatBody(`\u200e${choosenQueue.greetingMessage}`, ticket),
+          text: hasVisibleText(formattedText) ? formattedText : "Escolha uma opção",
           buttonText: "Escolha uma opção",
           sections,
         };

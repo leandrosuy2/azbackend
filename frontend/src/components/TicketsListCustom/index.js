@@ -315,12 +315,26 @@ const TicketsListCustom = (props) => {
 
     useEffect(() => {
         const shouldUpdateTicket = ticket => {
-            return (!ticket?.userId || ticket?.userId === userIdRef.current || showAllRef.current) &&
-                ((!ticket?.queueId && showTicketWithoutQueueRef.current) || selectedQueueIdsRef.current.indexOf(ticket?.queueId) > -1)
+            if (!ticket) return false;
+
+            const isAssignedToCurrentUser = ticket.userId === userIdRef.current;
+            const canSeeByUser = !ticket.userId || isAssignedToCurrentUser || showAllRef.current;
+            const selectedQueueIds = selectedQueueIdsRef.current || [];
+            const canSeeByQueue =
+                isAssignedToCurrentUser ||
+                selectedQueueIds.length === 0 ||
+                (!ticket.queueId && showTicketWithoutQueueRef.current) ||
+                selectedQueueIds.indexOf(ticket.queueId) > -1;
+
+            return canSeeByUser && canSeeByQueue;
         }
 
         const notBelongsToUserQueues = (ticket) =>
-            ticket.queueId && selectedQueueIdsRef.current.indexOf(ticket.queueId) === -1;
+            ticket.queueId &&
+            ticket.userId !== userIdRef.current &&
+            !showAllRef.current &&
+            (selectedQueueIdsRef.current || []).length > 0 &&
+            selectedQueueIdsRef.current.indexOf(ticket.queueId) === -1;
 
         const onCompanyTicketTicketsList = (data) => {
             if (data.action === "updateUnread") {
