@@ -458,7 +458,7 @@ const ContactDrawer = ({
 }) => {
 	const classes = useStyles();
 	const history = useHistory();
-	const { user } = useContext(AuthContext);
+	const { user, socket } = useContext(AuthContext);
 	const { get } = useCompanySettings();
 
 	const [modalOpen, setModalOpen] = useState(false);
@@ -870,17 +870,32 @@ const ContactDrawer = ({
 				});
 				const list = Array.isArray(data?.lista) ? data.lista : [];
 				setKanbanTags(list);
-				setSelectedKanbanTagId((prev) => {
-					if (!prev) return "";
-					const exists = list.some((t) => String(t.id) === String(prev));
-					return exists ? String(prev) : "";
-				});
+
+				let preselectedLaneId = "";
+				if (contact?.id) {
+					try {
+						const { data: tk } = await api.get("/ticket/kanban", {
+							params: { contactId: contact.id, quadroGroupId: groupIdNum },
+						});
+						const tickets = Array.isArray(tk?.tickets) ? tk.tickets : [];
+						const candidate = tickets.find((t) => Number(t?.id) > 0) || tickets[0];
+						const lane = (candidate?.tags || []).find(
+							(tg) => Number(tg?.kanban) === 1
+						);
+						if (lane && list.some((t) => String(t.id) === String(lane.id))) {
+							preselectedLaneId = String(lane.id);
+						}
+					} catch (_) {
+						/* ignore */
+					}
+				}
+				setSelectedKanbanTagId(preselectedLaneId);
 			} catch (_) {
 				setKanbanTags([]);
 				setSelectedKanbanTagId("");
 			}
 		},
-		[]
+		[contact?.id]
 	);
 
 	useEffect(() => {
@@ -937,55 +952,73 @@ const ContactDrawer = ({
 		}
 	}, [contact]);
 
+	const loadProcesses = useCallback(async () => {
+		if (!contact?.id) return;
+		setLoadingProcesses(true);
+		try {
+			const { data } = await api.get(`/contacts/${contact.id}/processes`);
+			setContactProcesses(data.processes || data || []);
+		} catch (err) {
+			try {
+				const { data: ticketsData } = await api.get("/ticket/kanban", {
+					params: { contactId: contact.id },
+				});
+				const ticketsList = ticketsData.tickets || [];
+				let groups = [];
+				try {
+					const { data: groupsData } = await api.get("/quadro-groups");
+					groups = groupsData.groups || groupsData.lista || groupsData || [];
+				} catch (gErr) {
+					groups = [{ id: 1, name: "Kanban" }];
+				}
+				const groupMap = {};
+				for (const t of ticketsList) {
+					const gId = t.quadroGroupId || t.quadro_group_id || "1";
+					if (!groupMap[gId]) groupMap[gId] = 0;
+					groupMap[gId]++;
+				}
+				const processList = Object.entries(groupMap).map(([gId, count]) => {
+					const group = groups.find((g) => String(g.id) === String(gId));
+					return {
+						groupId: gId,
+						groupName: group?.name || "Kanban",
+						count,
+					};
+				});
+				setContactProcesses(processList);
+			} catch (innerErr) {
+				setContactProcesses([]);
+			}
+		}
+		setLoadingProcesses(false);
+	}, [contact?.id]);
+
 	// Carregar processos do contato (em quantos quadros/áreas ele está)
 	useEffect(() => {
 		if (activeTab !== 2 || !contact?.id) return;
-		const loadProcesses = async () => {
-			setLoadingProcesses(true);
-			try {
-				// Tenta buscar da API
-				const { data } = await api.get(`/contacts/${contact.id}/processes`);
-				setContactProcesses(data.processes || data || []);
-			} catch (err) {
-				// Fallback: buscar tickets do contato e agrupar por quadro group
-				try {
-					const { data: ticketsData } = await api.get("/ticket/kanban", {
-						params: { contactId: contact.id },
-					});
-					const ticketsList = ticketsData.tickets || [];
-					// Também buscar grupos
-					let groups = [];
-					try {
-						const { data: groupsData } = await api.get("/quadro-groups");
-						groups = groupsData.groups || groupsData.lista || groupsData || [];
-					} catch (gErr) {
-						groups = [{ id: 1, name: "Kanban" }];
-					}
-					// Agrupar tickets por quadroGroupId
-					const groupMap = {};
-					for (const t of ticketsList) {
-						const gId = t.quadroGroupId || t.quadro_group_id || "1";
-						if (!groupMap[gId]) groupMap[gId] = 0;
-						groupMap[gId]++;
-					}
-					// Montar lista de processos
-					const processList = Object.entries(groupMap).map(([gId, count]) => {
-						const group = groups.find((g) => String(g.id) === String(gId));
-						return {
-							groupId: gId,
-							groupName: group?.name || "Kanban",
-							count,
-						};
-					});
-					setContactProcesses(processList);
-				} catch (innerErr) {
-					setContactProcesses([]);
-				}
-			}
-			setLoadingProcesses(false);
-		};
 		loadProcesses();
-	}, [activeTab, contact?.id]);
+	}, [activeTab, contact?.id, loadProcesses]);
+
+	// Atualiza a aba Processos quando algum ticket/quadro mudar via socket
+	useEffect(() => {
+		if (activeTab !== 2 || !contact?.id || !user?.companyId || !socket) return;
+		const eventName = `company-${user.companyId}-ticket`;
+		let timer = null;
+		const scheduleReload = () => {
+			if (timer) clearTimeout(timer);
+			timer = setTimeout(() => {
+				loadProcesses();
+				setProcessTickets({});
+				setExpandedProcess(null);
+			}, 400);
+		};
+		const handler = () => scheduleReload();
+		socket.on(eventName, handler);
+		return () => {
+			if (timer) clearTimeout(timer);
+			socket.off(eventName, handler);
+		};
+	}, [activeTab, contact?.id, user?.companyId, socket, loadProcesses]);
 
 	const handleToggleProcess = async (groupId) => {
 		if (expandedProcess === groupId) {
@@ -1120,10 +1153,36 @@ const ContactDrawer = ({
 			toast.warn("Selecione a área de trabalho (workspace).");
 			return;
 		}
+
+		const targetGroupId = Number(selectedQuadroGroupId);
+		const currentGroupId =
+			ticket?.quadroGroupId != null && ticket.quadroGroupId !== ""
+				? Number(ticket.quadroGroupId)
+				: null;
+		const nomeProjetoTrim = (kanbanNomeProjeto || "").trim();
+
+		// Cada contato fica em 1 quadro por vez. Se o usuário escolheu outro quadro,
+		// confirmar antes de mover (para evitar conversa duplicada).
+		if (currentGroupId != null && currentGroupId !== targetGroupId) {
+			const fromName =
+				quadroGroups.find((g) => Number(g.id) === currentGroupId)?.name ||
+				`Quadro #${currentGroupId}`;
+			const toName =
+				quadroGroups.find((g) => Number(g.id) === targetGroupId)?.name ||
+				`Quadro #${targetGroupId}`;
+			const ok = window.confirm(
+				`O cliente vai sair de "${fromName}" e ir para "${toName}". ` +
+					`Cada cliente fica em apenas 1 quadro por vez.\n\n` +
+					`Se quiser que outro quadro cuide do cliente em paralelo (sem mover este ticket), ` +
+					`crie um cartão direto pela área Kanban daquele quadro.\n\nDeseja continuar?`
+			);
+			if (!ok) return;
+		}
+
 		setAttachingKanban(true);
 		try {
 			await api.put(`/tickets/${ticket.id}`, {
-				quadroGroupId: Number(selectedQuadroGroupId),
+				quadroGroupId: targetGroupId,
 			});
 			if (selectedKanbanTagId) {
 				try {
@@ -1133,7 +1192,6 @@ const ContactDrawer = ({
 				}
 				await api.put(`/ticket-tags/${ticket.id}/${selectedKanbanTagId}`);
 			}
-			const nomeProjetoTrim = (kanbanNomeProjeto || "").trim();
 			if (ticket?.uuid && nomeProjetoTrim) {
 				await api.put(`/tickets/${ticket.uuid}/quadro`, {
 					nomeProjeto: nomeProjetoTrim,
@@ -2084,22 +2142,8 @@ const ContactDrawer = ({
 									onClick={openKanbanDialog}
 									disabled={!ticket?.id}
 								>
-									{ticket?.quadroGroupId ? "Alterar área / abrir quadro" : "Vincular ao Kanban e abrir quadro"}
+									Vincular ao Kanban e abrir quadro
 								</Button>
-								{ticket?.quadroGroupId != null && ticket?.quadroGroupId !== "" && (
-									<Button
-										variant="outlined"
-										color="primary"
-										size="small"
-										fullWidth
-										style={{ marginTop: 8 }}
-										startIcon={<ViewModuleIcon />}
-										onClick={() => setQuadroModalOpen(true)}
-										disabled={!ticket?.uuid}
-									>
-										Abrir quadro (edição completa)
-									</Button>
-								)}
 							</Paper>
 
 							<Divider style={{ margin: "4px 0" }} />
@@ -2228,7 +2272,18 @@ const ContactDrawer = ({
 														>
 															{(proc.groupName || "K").charAt(0).toUpperCase()}
 														</div>
-														<span>{proc.groupName || "Kanban"}</span>
+														<div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+															<span>{proc.groupName || "Kanban"}</span>
+															{Array.isArray(proc.stages) && proc.stages.length > 0 && (
+																<Typography
+																	variant="caption"
+																	color="textSecondary"
+																	style={{ lineHeight: 1.2, fontWeight: 500 }}
+																>
+																	Etapa: {proc.stages.join(", ")}
+																</Typography>
+															)}
+														</div>
 													</div>
 													<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 														<div className={classes.processCount}>
@@ -2458,7 +2513,7 @@ const ContactDrawer = ({
 				fullWidth
 				maxWidth="xs"
 			>
-				<DialogTitle>Vincular ticket ao Kanban</DialogTitle>
+				<DialogTitle>Vincular ao Kanban e abrir quadro</DialogTitle>
 				<DialogContent>
 					{loadingKanbanMeta ? (
 						<div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
@@ -2513,7 +2568,8 @@ const ContactDrawer = ({
 								</Select>
 							</FormControl>
 							<Typography variant="caption" color="textSecondary" style={{ display: "block", marginTop: 12 }}>
-								Após confirmar, o quadro abrirá para você preencher projeto, valores e anexos.
+								Cada cliente fica em apenas 1 quadro por vez. Escolher outro quadro move este ticket para lá.
+								Para outra equipe atender em paralelo, crie um cartão direto pela área Kanban daquele quadro.
 							</Typography>
 						</>
 					)}

@@ -102,7 +102,8 @@ const ticketAttributes = [
   "userId",
   "amountUsedBotQueuesNPS",
   "lgpdSendMessageAt",
-  "isBot"
+  "isBot",
+  "quadroGroupId"
 ] as const;
 
 function buildStandaloneTicketPayload(quadro: TicketQuadro, companyId: number): Record<string, unknown> {

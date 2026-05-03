@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer, useContext, useRef } from "react";
+import React, { useState, useEffect, useReducer, useContext, useRef, useMemo } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import List from "@material-ui/core/List";
 import Paper from "@material-ui/core/Paper";
@@ -242,6 +242,20 @@ const TicketsListCustom = (props) => {
     const { companyId } = user;
     const showTicketWithoutQueue =
         user.allTicket === "enable" || user.allTicket === "enabled";
+    const tagsParam = useMemo(() => JSON.stringify(tags || []), [tags]);
+    const usersParam = useMemo(() => JSON.stringify(users || []), [users]);
+    const queueIdsParam = useMemo(
+        () => JSON.stringify(selectedQueueIds || []),
+        [selectedQueueIds]
+    );
+    const whatsappIdsParam = useMemo(
+        () => JSON.stringify(whatsappIds || []),
+        [whatsappIds]
+    );
+    const statusFilterParam = useMemo(
+        () => JSON.stringify(statusFilter || []),
+        [statusFilter]
+    );
 
     const { tickets, hasMore, loading } = useTickets({
         pageNumber,
@@ -249,39 +263,43 @@ const TicketsListCustom = (props) => {
         status,
         showAll,
         searchOnMessages: searchOnMessages ? "true" : "false",
-        tags: JSON.stringify(tags),
-        users: JSON.stringify(users),
-        queueIds: JSON.stringify(selectedQueueIds),
-        whatsappIds: JSON.stringify(whatsappIds),
-        statusFilter: JSON.stringify(statusFilter),
+        tags: tagsParam,
+        users: usersParam,
+        queueIds: queueIdsParam,
+        whatsappIds: whatsappIdsParam,
+        statusFilter: statusFilterParam,
         userFilter,
         sortTickets,
         unreadOnly,
         groupsOnly,
+        forceSearch,
     });
 
-    const ticketsSnapshotRef = useRef(tickets);
-    ticketsSnapshotRef.current = tickets;
-
     useEffect(() => {
-        tdlog("TicketsListCustom: RESET reducer (filtros mudaram) → lista zera; rehidrata com snapshot do hook", {
+        tdlog("TicketsListCustom: RESET reducer (filtros mudaram) → lista zera e aguarda API nova", {
             status,
             searchParam: searchParam || null,
-            tags,
-            selectedQueueIds,
-            snapshotQtd: Array.isArray(ticketsSnapshotRef.current) ? ticketsSnapshotRef.current.length : null,
+            tags: tagsParam,
+            selectedQueueIds: queueIdsParam,
         });
         dispatch({ type: "RESET" });
         setPageNumber(1);
-        if (user?.id != null) {
-            dispatch({
-                type: "LOAD_TICKETS",
-                payload: ticketsSnapshotRef.current,
-                status,
-                sortDir: sortTickets,
-            });
-        }
-    }, [status, searchParam, dispatch, showAll, tags, users, forceSearch, selectedQueueIds, whatsappIds, statusFilter, sortTickets, searchOnMessages, unreadOnly, groupsOnly, user?.id, sortTickets]);
+    }, [
+        status,
+        searchParam,
+        showAll,
+        tagsParam,
+        usersParam,
+        forceSearch,
+        queueIdsParam,
+        whatsappIdsParam,
+        statusFilterParam,
+        sortTickets,
+        searchOnMessages,
+        unreadOnly,
+        groupsOnly,
+        user?.id
+    ]);
 
     useEffect(() => {
         if (user?.id == null) return;

@@ -1,32 +1,14 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { i18n } from "../../translate/i18n";
-import { Avatar, Box, Divider, Typography } from "@material-ui/core";
+import { Avatar, Box, Divider, IconButton, Typography } from "@material-ui/core";
 import Tooltip from "@material-ui/core/Tooltip";
 import PersonOutline from "@material-ui/icons/PersonOutline";
 import Edit from "@material-ui/icons/Edit";
+import CloseIcon from "@material-ui/icons/Close";
+import toastError from "../../errors/toastError";
+import api from "../../services/api";
 
 const MAX_ORDER = 2147483647;
-
-/** Colunas do Kanban no ticket (tag.kanban === 1). */
-const ticketKanbanColumnTags = (ticket) => {
-	const list = Array.isArray(ticket?.tags) ? ticket.tags : [];
-	const withKb = list.filter((t) => t != null && t.kanban != null && t.kanban !== "");
-	if (withKb.length) {
-		return list
-			.filter((t) => Number(t?.kanban) === 1)
-			.sort((a, b) => {
-				const oa = a.inboxOrder != null ? Number(a.inboxOrder) : MAX_ORDER;
-				const ob = b.inboxOrder != null ? Number(b.inboxOrder) : MAX_ORDER;
-				if (oa !== ob) return oa - ob;
-				return String(a.name || "").localeCompare(String(b.name || ""), undefined, {
-					sensitivity: "base",
-				});
-			});
-	}
-	/** API antiga sem `kanban` nas tags do ticket: assume que são só colunas do quadro. */
-	if (list.length === 1) return list;
-	return [];
-};
 
 /** Etapas só de filtro na inbox (tag.kanban === 2 no contato) — funil na inbox. */
 const contactInboxFunnelTags = (contact) => {
@@ -44,28 +26,14 @@ const contactInboxFunnelTags = (contact) => {
 };
 
 const TicketInfo = ({ contact, ticket, onClick }) => {
-	const kanbanCols = useMemo(() => ticketKanbanColumnTags(ticket), [ticket?.tags]);
 	const funnelContactTags = useMemo(() => contactInboxFunnelTags(contact), [contact?.tags]);
 
-	const quadroGroupName = useMemo(() => {
-		for (const t of kanbanCols) {
-			const n = t?.quadroGroup?.name;
-			if (n) return n;
-		}
-		return null;
-	}, [kanbanCols]);
-
-	/** Nome do funil: área do quadro (tag) ou etapas de funil no contato (kanban=2). */
+	/** Nome do funil: apenas etapas do funil no contato (kanban=2). */
 	const funnelDisplay = useMemo(() => {
-		if (quadroGroupName) return quadroGroupName;
 		if (!funnelContactTags.length) return null;
 		return funnelContactTags.map((t) => t.name).filter(Boolean).join(", ");
-	}, [quadroGroupName, funnelContactTags]);
-
-	const stageColumnText = useMemo(() => {
-		if (!kanbanCols.length) return null;
-		return kanbanCols.map((t) => t.name).filter(Boolean).join(", ");
-	}, [kanbanCols]);
+	}, [funnelContactTags]);
+	const primaryFunnelTag = funnelContactTags[0] || null;
 
 	const name = contact?.name || "(sem contato)";
 
@@ -87,6 +55,17 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 			return undefined;
 		});
 	}, [contact]);
+
+	const handleRemoveFunnel = useCallback(async (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!contact?.id || !primaryFunnelTag?.id) return;
+		try {
+			await api.delete(`/tags-contacts/${primaryFunnelTag.id}/${contact.id}`);
+		} catch (err) {
+			toastError(err);
+		}
+	}, [contact?.id, primaryFunnelTag?.id]);
 
 	return (
 		<React.Fragment>
@@ -160,7 +139,7 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 					pr={0.5}
 				>
 					{funnelDisplay ? (
-						<Box mb={stageColumnText ? 0.75 : 0}>
+						<Box>
 							<Typography
 								variant="caption"
 								color="textSecondary"
@@ -169,53 +148,39 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 							>
 								{i18n.t("messagesList.header.funnelLabel")}
 							</Typography>
-							<Tooltip title={funnelDisplay}>
-								<Typography
-									variant="body2"
-									component="div"
-									style={{
-										fontWeight: 700,
-										lineHeight: 1.3,
-										wordBreak: "break-word",
-										overflowWrap: "anywhere",
-									}}
-								>
-									{funnelDisplay}
-								</Typography>
-							</Tooltip>
+							<Box display="flex" alignItems="center" minWidth={0} style={{ gap: 4 }}>
+								<Tooltip title={funnelDisplay}>
+									<Typography
+										variant="body2"
+										component="div"
+										style={{
+											fontWeight: 700,
+											lineHeight: 1.3,
+											wordBreak: "break-word",
+											overflowWrap: "anywhere",
+											minWidth: 0,
+										}}
+									>
+										{funnelDisplay}
+									</Typography>
+								</Tooltip>
+								<Tooltip title="Remover do funil">
+									<IconButton
+										size="small"
+										aria-label="Remover do funil"
+										onClick={handleRemoveFunnel}
+										style={{ padding: 2, flexShrink: 0 }}
+									>
+										<CloseIcon style={{ fontSize: 14 }} />
+									</IconButton>
+								</Tooltip>
+							</Box>
 						</Box>
-					) : null}
-					{stageColumnText ? (
-						<Box>
-							<Typography
-								variant="caption"
-								color="textSecondary"
-								component="div"
-								style={{ lineHeight: 1.2, textTransform: "none" }}
-							>
-								{i18n.t("messagesList.header.kanbanStageLabel")}
-							</Typography>
-							<Tooltip title={stageColumnText}>
-								<Typography
-									variant="body2"
-									component="div"
-									style={{
-										fontWeight: 700,
-										lineHeight: 1.3,
-										wordBreak: "break-word",
-										overflowWrap: "anywhere",
-									}}
-								>
-									{stageColumnText}
-								</Typography>
-							</Tooltip>
-						</Box>
-					) : null}
-					{!funnelDisplay && !stageColumnText ? (
+					) : (
 						<Typography variant="body2" color="textSecondary" component="div">
 							—
 						</Typography>
-					) : null}
+					)}
 				</Box>
 			</Box>
 		</React.Fragment>

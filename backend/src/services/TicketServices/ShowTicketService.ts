@@ -54,7 +54,8 @@ const ShowTicketService = async (
       "fromMe",
       "isOutOfHour",
       "isActiveDemand",
-      "typebotSessionTime"
+      "typebotSessionTime",
+      "quadroGroupId"
     ],
     include: [
       {

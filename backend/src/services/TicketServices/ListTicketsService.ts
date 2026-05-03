@@ -272,6 +272,10 @@ const ListTicketsService = async ({
   }
   else
     if (status === "search") {
+      // Busca só mostra atendimentos em curso: ATENDENDO (open), AGUARDANDO (pending) e Grupos.
+      // Histórico (closed/nps/lgpd) fica de fora — pode entrar futuramente em uma view dedicada.
+      const ACTIVE_SEARCH_STATUSES = ["pending", "open", "group"];
+
       whereCondition = {
         companyId
       }
@@ -280,7 +284,7 @@ const ListTicketsService = async ({
         latestTickets = await Ticket.findAll({
           attributes: ['companyId', 'contactId', 'whatsappId', [literal('MAX("id")'), 'id']],
           where: {
-            [Op.or]: [{ userId }, { status: ["pending", "closed", "group"] }],
+            status: ACTIVE_SEARCH_STATUSES,
             ...(effectiveQueueIds.length > 0
               ? {
                   queueId:
@@ -296,24 +300,22 @@ const ListTicketsService = async ({
       } else {
         let whereCondition2: Filterable["where"] = {
           companyId,
-          [Op.or]: [{ userId }, { status: ["pending", "closed", "group"] }]
+          status: ACTIVE_SEARCH_STATUSES
         }
 
         if (showAll === "false" && user.profile === "admin") {
           whereCondition2 = {
             ...whereCondition2,
             ...(effectiveQueueIds.length > 0 ? { queueId: effectiveQueueIds } : {}),
-
-            // [Op.or]: [{ userId }, { status: ["pending", "closed", "group"] }],
           }
 
         } else if (showAll === "true" && user.profile === "admin") {
           whereCondition2 = {
             companyId,
+            status: ACTIVE_SEARCH_STATUSES,
             ...(effectiveQueueIds.length > 0
               ? { queueId: { [Op.or]: [effectiveQueueIds, null] } }
               : {}),
-            // status: ["pending", "closed", "group"]
           }
         }
 
@@ -329,7 +331,8 @@ const ListTicketsService = async ({
 
       whereCondition = {
         ...whereCondition,
-        id: ticketIds
+        id: ticketIds,
+        status: ACTIVE_SEARCH_STATUSES
       };
 
       // if (date) {

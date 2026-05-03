@@ -373,7 +373,7 @@ const NewTicketModal = ({
   };
 
   const renderContactAutocomplete = () => {
-    if (initialContact === undefined || initialContact.id === undefined) {
+    if (isKanbanArea && (initialContact === undefined || initialContact.id === undefined)) {
       return (
         <Grid xs={12} item>
           <Autocomplete
@@ -393,14 +393,13 @@ const NewTicketModal = ({
             renderInput={params => (
               <TextField
                 {...params}
-                label={
-                  isKanbanArea
-                    ? "Contato (opcional)"
-                    : i18n.t("newTicketModal.fieldLabel")
-                }
+                label="Telefone ou nome do cliente (opcional)"
+                placeholder="Digite ao menos 3 letras do nome ou parte do número…"
                 variant="outlined"
-                autoFocus={!isKanbanArea}
-                onChange={e => setSearchParam(e.target.value)}
+                onChange={e => {
+                  setSearchParam(e.target.value);
+                  setPhoneInput(e.target.value);
+                }}
                 onKeyPress={e => {
                   if (loading) return;
                   if (e.key === "Enter" && (selectedContact || isKanbanArea)) {
@@ -427,17 +426,21 @@ const NewTicketModal = ({
     return null;
   }
 
-  const phoneDigitsLen = (phoneInput || "").replace(/\D/g, "").length;
-
   return (
     <>
 
-      <Dialog open={modalOpen} onClose={handleClose}>
+      <Dialog
+        open={modalOpen}
+        onClose={handleClose}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ style: { minHeight: 520 } }}
+      >
         <DialogTitle id="form-dialog-title">
           {i18n.t("newTicketModal.title")}
         </DialogTitle>
-        <DialogContent dividers>
-          <Grid style={{ width: 340, maxWidth: "100%" }} container spacing={2}>
+        <DialogContent dividers style={{ minHeight: 380 }}>
+          <Grid style={{ width: "100%", maxWidth: "100%" }} container spacing={2}>
             {isKanbanArea && (
               <>
                 <Grid xs={12} item>
@@ -454,37 +457,11 @@ const NewTicketModal = ({
                 </Grid>
                 <Grid xs={12} item>
                   <Typography variant="caption" color="textSecondary" component="p" style={{ margin: 0 }}>
-                    No Kanban pode criar só com o título; o contato é opcional. Na caixa de atendimento
-                    é obrigatório escolher um contato ou informar o número abaixo.
+                    Busque o contato pelo nome ou telefone abaixo. O contato é opcional.
+                    Pode criar o cartão só com o título.
                   </Typography>
                 </Grid>
-                <Grid xs={12} item>
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    label="Telefone (opcional)"
-                    placeholder="Ex.: 5511999998888 ou só DDD+número"
-                    value={phoneInput}
-                    onChange={(e) => setPhoneInput(e.target.value)}
-                    helperText="Se não escolher um contato acima, pode informar o número — o sistema busca ou cria o cadastro e vincula ao cartão."
-                  />
-                </Grid>
               </>
-            )}
-            {!isKanbanArea && (
-              <Grid xs={12} item>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  label={i18n.t("newTicketModal.phoneFieldLabel")}
-                  placeholder="5511999998888"
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  helperText={i18n.t("newTicketModal.phoneFieldHelp")}
-                />
-              </Grid>
             )}
             {/* CONTATO */}
             {renderContactAutocomplete()}
@@ -493,6 +470,9 @@ const NewTicketModal = ({
             <>
             {/* FILA */}
             <Grid xs={12} item>
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                Fila da mensagem
+              </Typography>
               <Select
                 fullWidth
                 displayEmpty
@@ -536,6 +516,9 @@ const NewTicketModal = ({
             </Grid>
             {/* CONEXAO */}
             <Grid xs={12} item>
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                Atendente daquele cliente
+              </Typography>
               <Select
                 fullWidth
                 displayEmpty
@@ -615,7 +598,7 @@ const NewTicketModal = ({
             type="button"
             disabled={
               loading ||
-              (!isKanbanArea && !selectedContact?.id && phoneDigitsLen < 10)
+              (!isKanbanArea && !selectedContact?.id)
             }
             onClick={() => handleSaveTicket(false)}
             color="primary"

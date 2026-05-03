@@ -230,8 +230,9 @@ export const kanban = async (req: Request, res: Response): Promise<Response> => 
     tags: tagIdsStringified,
     users: userIdsStringified,
     withUnreadMessages,
-    quadroGroupId
-  } = req.query as IndexQuery & { quadroGroupId?: string };
+    quadroGroupId,
+    contactId
+  } = req.query as IndexQuery & { quadroGroupId?: string; contactId?: string };
 
   const userId = req.user.id;
   const { companyId } = req.user;
@@ -267,7 +268,8 @@ export const kanban = async (req: Request, res: Response): Promise<Response> => 
     queueIds,
     withUnreadMessages,
     companyId,
-    quadroGroupId
+    quadroGroupId,
+    contactId
   });
 
   return res.status(200).json({ tickets, count, hasMore });

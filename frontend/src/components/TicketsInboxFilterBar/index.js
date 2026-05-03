@@ -393,7 +393,6 @@ const TicketsInboxFilterBar = ({
       if (!contactId) return;
       await api.post(`/tags/contact-link/${contactId}/${tag.id}`);
       toast.success(`Etiqueta "${tag.name}" aplicada ao contato.`);
-      if (onContactTagged) onContactTagged(tag);
     } catch (err) {
       toastError(err);
     }
@@ -568,27 +567,6 @@ const TicketsInboxFilterBar = ({
           </Box>
         </Box>
         <Box className={classes.chipWrapStrip}>
-          <Chip
-            size="small"
-            className={`${classes.quickChip} ${classes.chipScrollItem} ${
-              quickFilter === "all" && !folderTagId ? classes.quickChipActive : ""
-            }`}
-            label="Todos"
-            color="default"
-            onClick={() => {
-              onQuickFilterChange("all");
-              onFolderTagChange(null);
-            }}
-          />
-          <Chip
-            size="small"
-            className={`${classes.quickChip} ${classes.chipScrollItem} ${
-              quickFilter === "unread" ? classes.quickChipActive : ""
-            }`}
-            label="Não lidos"
-            color="default"
-            onClick={() => onQuickFilterChange("unread")}
-          />
           {stageInline.map((tag) => renderScrollTagChip(tag, "s"))}
           {stageOverflow.length > 0 && (
             <>
@@ -626,6 +604,34 @@ const TicketsInboxFilterBar = ({
               </Menu>
             </>
           )}
+        </Box>
+      </Box>
+
+      <Box className={classes.section}>
+        <Box className={classes.sectionHeader}>
+          <Typography className={classes.sectionLabel} component="span">
+            Filtros do chat
+          </Typography>
+        </Box>
+        <Box className={classes.chipWrapStrip}>
+          <Chip
+            size="small"
+            className={`${classes.quickChip} ${classes.chipScrollItem} ${
+              quickFilter === "all" ? classes.quickChipActive : ""
+            }`}
+            label="Todos"
+            color="default"
+            onClick={() => onQuickFilterChange("all")}
+          />
+          <Chip
+            size="small"
+            className={`${classes.quickChip} ${classes.chipScrollItem} ${
+              quickFilter === "unread" ? classes.quickChipActive : ""
+            }`}
+            label="Não lidos"
+            color="default"
+            onClick={() => onQuickFilterChange("unread")}
+          />
         </Box>
       </Box>
 
