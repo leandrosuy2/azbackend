@@ -1,6 +1,7 @@
 node_modules
 dist
 .env
+.env.vps-dev
 yarn.lock
 yarn-error.log
 
