@@ -11,6 +11,7 @@ yarn-error.log
 /coverage/
 
 postgres_data
+postgres18*
 docs/SINCRONIZAR-BANCO-PRODUCAO-PARA-LOCAL.md
 azvdodesigner_dump.sql
 public/company*
