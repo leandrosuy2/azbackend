@@ -135,6 +135,7 @@ interface Request {
   users: number[];
   companyId: number;
   quadroGroupId?: number | string;
+  contactId?: number | string;
 }
 
 interface Response {
@@ -158,8 +159,16 @@ const ListTicketsServiceKanban = async ({
   userId,
   withUnreadMessages,
   companyId,
-  quadroGroupId
+  quadroGroupId,
+  contactId
 }: Request): Promise<Response> => {
+  const contactIdNum =
+    contactId != null && contactId !== ""
+      ? typeof contactId === "string"
+        ? parseInt(contactId, 10)
+        : Number(contactId)
+      : NaN;
+  const contactIdFilter = Number.isFinite(contactIdNum) ? contactIdNum : null;
   const listViewGroupNum =
     quadroGroupId != null && quadroGroupId !== ""
       ? typeof quadroGroupId === "string"
@@ -243,6 +252,13 @@ const ListTicketsServiceKanban = async ({
     ...whereCondition,
     status: { [Op.or]: ["pending", "open"] }
   };
+
+  if (contactIdFilter != null) {
+    whereCondition = {
+      ...whereCondition,
+      contactId: contactIdFilter
+    };
+  }
 
   if (searchParam) {
     const sanitizedSearchParam = searchParam.toLocaleLowerCase().trim();
@@ -627,7 +643,14 @@ const ListTicketsServiceKanban = async ({
       try {
         // Sem include: evita erro de associação/migration e não derruba o Kanban inteiro.
         const standalonesHome = await TicketQuadro.findAll({
-          where: { companyId, ticketId: null, quadroGroupId: groupIdNum },
+          where: {
+            companyId,
+            ticketId: null,
+            quadroGroupId: groupIdNum,
+            ...(contactIdFilter != null
+              ? { linkedContactId: contactIdFilter }
+              : {})
+          },
           order: [["updatedAt", "DESC"]],
           limit: 300,
           include: [
@@ -653,7 +676,10 @@ const ListTicketsServiceKanban = async ({
             companyId,
             ticketId: null,
             quadroGroupId: { [Op.ne]: groupIdNum },
-            sharedGroupIds: { [Op.ne]: null }
+            sharedGroupIds: { [Op.ne]: null },
+            ...(contactIdFilter != null
+              ? { linkedContactId: contactIdFilter }
+              : {})
           },
           order: [["updatedAt", "DESC"]],
           limit: 400,

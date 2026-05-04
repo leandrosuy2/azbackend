@@ -40,6 +40,7 @@ import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import { debounce } from "../../helpers/Debounce";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import formatBody from "../../helpers/Mustache";
+import hasVisibleText from "../../helpers/HasVisibleText";
 import TicketTraking from "../../models/TicketTraking";
 import UserRating from "../../models/UserRating";
 import SendWhatsAppMessage from "./SendWhatsAppMessage";
@@ -1581,6 +1582,18 @@ const verifyQueue = async (
           debouncedSentgreetingMediaAttachment();
         } else {
           console.log("log... 1250");
+          if (hasVisibleText(body)) {
+            await wbot.sendMessage(
+              `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
+              {
+                text: body,
+              }
+            );
+          }
+        }
+      } else {
+        console.log("log... 1259");
+        if (hasVisibleText(body)) {
           await wbot.sendMessage(
             `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
             {
@@ -1588,14 +1601,6 @@ const verifyQueue = async (
             }
           );
         }
-      } else {
-        console.log("log... 1259");
-        await wbot.sendMessage(
-          `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-          {
-            text: body,
-          }
-        );
       }
     }
 
@@ -2206,6 +2211,8 @@ const verifyQueue = async (
           console.log("log... 1824");
           const debouncedSentMessage = debounce(
             async () => {
+              if (!hasVisibleText(body)) return;
+
               const sentMessage = await wbot.sendMessage(
                 `${contact.number}@${
                   ticket.isGroup ? "g.us" : "s.whatsapp.net"
@@ -2239,6 +2246,8 @@ const verifyQueue = async (
 
         const debouncedSentMessage = debounce(
           async () => {
+            if (!hasVisibleText(body)) return;
+
             const sentMessage = await wbot.sendMessage(
               `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
               {
@@ -2710,7 +2719,9 @@ const verifyQueue = async (
 
               const listMessage = {
                 title: "Lista\n",
-                text: formatBody(`\u200e${greetingMessage}\n`),
+                text: hasVisibleText(formatBody(`\u200e${greetingMessage}\n`, ticket))
+                  ? formatBody(`\u200e${greetingMessage}\n`, ticket)
+                  : "Escolha uma opção",
                 buttonText: "Clique aqui",
                 //footer: "_",
                 sections,
@@ -2756,7 +2767,9 @@ const verifyQueue = async (
 
             const listMessage = {
               title: "Lista\n",
-              text: formatBody(`\u200e${greetingMessage}\n`),
+              text: hasVisibleText(formatBody(`\u200e${greetingMessage}\n`, ticket))
+                ? formatBody(`\u200e${greetingMessage}\n`, ticket)
+                : "Escolha uma opção",
               buttonText: "Clique aqui",
               //footer: "_",
               sections,
@@ -2934,7 +2947,9 @@ const verifyQueue = async (
                   message: {
                     interactiveMessage: {
                       body: {
-                        text: `\u200e${choosenQueue.greetingMessage}`,
+                        text: hasVisibleText(formatBody(`\u200e${choosenQueue.greetingMessage}`, ticket))
+                          ? formatBody(`\u200e${choosenQueue.greetingMessage}`, ticket)
+                          : "Escolha uma opção",
                       },
                       nativeFlowMessage: {
                         buttons: buttons,
@@ -3257,7 +3272,9 @@ const verifyQueue = async (
                         message: {
                           interactiveMessage: {
                             body: {
-                              text: `\u200e${greetingMessage}`,
+                              text: hasVisibleText(formatBody(`\u200e${greetingMessage}`, ticket))
+                                ? formatBody(`\u200e${greetingMessage}`, ticket)
+                                : "Escolha uma opção",
                             },
                             header: {
                               imageMessage, // Anexa a imagem
@@ -3345,7 +3362,9 @@ const verifyQueue = async (
                     message: {
                       interactiveMessage: {
                         body: {
-                          text: `\u200e${greetingMessage}`,
+                          text: hasVisibleText(formatBody(`\u200e${greetingMessage}`, ticket))
+                            ? formatBody(`\u200e${greetingMessage}`, ticket)
+                            : "Escolha uma opção",
                         },
                         nativeFlowMessage: {
                           buttons: buttons,
@@ -3440,7 +3459,9 @@ const verifyQueue = async (
                   message: {
                     interactiveMessage: {
                       body: {
-                        text: `\u200e${greetingMessage}`,
+                        text: hasVisibleText(formatBody(`\u200e${greetingMessage}`, ticket))
+                          ? formatBody(`\u200e${greetingMessage}`, ticket)
+                          : "Escolha uma opção",
                       },
                       nativeFlowMessage: {
                         buttons: buttons,

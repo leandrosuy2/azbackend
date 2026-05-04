@@ -39,6 +39,7 @@ const CreateTicketLembreteService = async (
 
   const tipo = (data.tipoGatilho || "agendado").trim() || "agendado";
   const precisaDataHora = tipo === "agendado";
+  const descricao = data.descricao?.trim() || null;
 
   if (precisaDataHora && (!data.data || !data.hora)) {
     throw new AppError("ERR_LEMBRETE_DATA_HORA_REQUIRED", 400);
@@ -56,14 +57,15 @@ const CreateTicketLembreteService = async (
     ticketId,
     companyId,
     nome,
-    descricao: data.descricao?.trim() || null,
+    descricao,
     data: data.data || null,
     hora: data.hora ? data.hora.trim() : null,
     eventoId: data.eventoId ?? null,
     addGoogle: data.addGoogle === true,
     tipoGatilho: tipo,
     ativo: data.ativo !== false,
-    mensagemTemplate: data.mensagemTemplate?.trim() || null,
+    mensagemTemplate:
+      data.mensagemTemplate?.trim() || (tipo === "agendado" ? descricao : null),
     destinoTipo: destinoNorm || "interno",
     destinoId: data.destinoId != null ? Number(data.destinoId) : null,
     diasAntecedencia:

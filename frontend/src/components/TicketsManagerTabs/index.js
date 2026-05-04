@@ -14,16 +14,25 @@ import {
   Tooltip,
   Switch,
   Box,
+  Avatar,
   IconButton,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Divider,
+  CircularProgress,
 } from "@material-ui/core";
 import {
   Group,
   MessageSharp as MessageSharpIcon,
   AccessTime as ClockIcon,
   Search as SearchIcon,
-  Chat as ChatIcon,
+  PersonAdd as PersonAddIcon,
+  AddCommentOutlined as NewMessageIcon,
 } from "@material-ui/icons";
 
+import api from "../../services/api";
 import NewTicketModal from "../NewTicketModal";
 
 import TicketsList from "../TicketsListCustom";
@@ -38,6 +47,7 @@ import { TicketsContext } from "../../context/Tickets/TicketsContext";
 
 /** Referência estável: `users={[]}` no JSX gerava array novo a cada render e o `useEffect` do TicketsList fazia RESET apagando os tickets. */
 const EMPTY_FILTER_ARRAY = [];
+const SEARCH_TICKET_STATUS_FILTER = ["open", "pending"];
 
 /** Console em dev. Desliga: `localStorage.setItem('DEBUG_TICKETS','0'); location.reload()` */
 const tdlog = (...args) => {
@@ -215,15 +225,6 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
   },
 
-  newChatButton: {
-    flexShrink: 0,
-    color: "#25D366",
-    padding: theme.spacing(0.75),
-    "&:hover": {
-      backgroundColor: alpha("#25D366", 0.12),
-    },
-  },
-
   searchInput: {
     flex: "1 1 0%",
     minWidth: 0,
@@ -237,11 +238,61 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
+  searchModeButton: {
+    width: 32,
+    height: 32,
+    padding: 0,
+    flexShrink: 0,
+    color: "#25d366",
+    borderRadius: 6,
+    "&:hover": {
+      backgroundColor: alpha("#25d366", 0.12),
+      color: "#1fa855",
+    },
+  },
+  searchModeButtonActive: {
+    color: "#25d366",
+    backgroundColor: alpha("#25d366", 0.16),
+  },
 
   customBadge: {
     right: "-10px",
     backgroundColor: "#f44336",
     color: "#fff",
+  },
+
+  searchSectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(1),
+    padding: theme.spacing(0.75, 1.25),
+    background: alpha(theme.palette.primary.main, 0.06),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    color: theme.palette.text.secondary,
+    flexShrink: 0,
+  },
+  searchContactsBox: {
+    flex: "1 1 0%",
+    minHeight: 0,
+    overflowY: "auto",
+    background: theme.palette.background.paper,
+  },
+  searchContactsEmpty: {
+    padding: theme.spacing(1.5, 2),
+    textAlign: "center",
+  },
+  searchContactItem: {
+    paddingTop: theme.spacing(0.5),
+    paddingBottom: theme.spacing(0.5),
+  },
+  searchContactSecondary: {
+    fontSize: 12,
+    color: theme.palette.text.secondary,
   },
 
 }));
@@ -257,9 +308,12 @@ const TicketsManagerTabs = () => {
 
   const searchInputRef = useRef();
   const [searchOnMessages, setSearchOnMessages] = useState(false);
+  const [searchMode, setSearchMode] = useState("messages");
+  const [searchContacts, setSearchContacts] = useState([]);
+  const [loadingSearchContacts, setLoadingSearchContacts] = useState(false);
+  const [newTicketInitialContact, setNewTicketInitialContact] = useState(undefined);
 
   const { user } = useContext(AuthContext);
-  const { profile } = user;
   const { setSelectedQueuesMessage } = useContext(QueueSelectedContext);
   const { tabOpen, setTabOpen } = useContext(TicketsContext);
 
@@ -303,6 +357,34 @@ const TicketsManagerTabs = () => {
     setForceSearch(!forceSearch);
   }, [tab]);
 
+  useEffect(() => {
+    if (tab !== "search" || searchMode !== "contacts") {
+      setSearchContacts([]);
+      setLoadingSearchContacts(false);
+      return;
+    }
+    const term = (searchParam || "").trim();
+    setLoadingSearchContacts(true);
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get("contacts", {
+          params: { searchParam: term, pageNumber: 1, limit: 50 },
+        });
+        const list = Array.isArray(data?.contacts) ? data.contacts : [];
+        setSearchContacts(list.slice(0, 50));
+      } catch (_) {
+        setSearchContacts([]);
+      }
+      setLoadingSearchContacts(false);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [tab, searchMode, searchParam]);
+
+  const handleStartConversationWithContact = (contact) => {
+    setNewTicketInitialContact(contact);
+    setNewTicketModalOpen(true);
+  };
+
   let searchTimeout;
 
   const handleSearch = (e) => {
@@ -313,10 +395,13 @@ const TicketsManagerTabs = () => {
     if (searchedTerm === "") {
       setSearchParam(searchedTerm);
       setForceSearch(!forceSearch);
-      // setFilter(false);
-      setTab("open");
+      if (searchMode === "contacts") {
+        setTab("search");
+      } else {
+        setTab("open");
+      }
       return;
-    } else if (tab !== "search") {
+    } else if (searchMode === "contacts" && tab !== "search") {
       setTab("search");
     }
 
@@ -326,6 +411,24 @@ const TicketsManagerTabs = () => {
     }, 500);
   };
 
+  const handleToggleContactSearch = () => {
+    if (searchMode === "contacts") {
+      setSearchMode("messages");
+      setSearchContacts([]);
+      setLoadingSearchContacts(false);
+      setSearchParam("");
+      setTab("open");
+      setForceSearch((current) => !current);
+      if (searchInputRef.current) {
+        searchInputRef.current.value = "";
+      }
+      return;
+    }
+
+    setSearchMode("contacts");
+    setTab("search");
+  };
+
   const handleBack = () => {
 
     history.push("/tickets");
@@ -333,6 +436,7 @@ const TicketsManagerTabs = () => {
 
   const handleCloseNewTicketModal = (ticket) => {
     setNewTicketModalOpen(false);
+    setNewTicketInitialContact(undefined);
     if (ticket && !ticket.standalone && (ticket.uuid || ticket.id)) {
       history.push(`/tickets/${ticket.uuid != null ? ticket.uuid : ticket.id}`);
     }
@@ -364,44 +468,53 @@ const TicketsManagerTabs = () => {
   return (
     <Paper elevation={0} variant="outlined" className={classes.ticketsWrapper}>
       <div className={classes.topSearchRow}>
-        <Tooltip
-          title={i18n.t("tickets.inbox.newConversationTooltip")}
-        >
-          <IconButton
-            className={classes.newChatButton}
-            aria-label={i18n.t("tickets.inbox.newConversationAria")}
-            size="small"
-            onClick={() => setNewTicketModalOpen(true)}
-          >
-            <ChatIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
         <Box className={classes.searchFieldCluster}>
           <SearchIcon className={classes.searchIcon} />
           <InputBase
             className={classes.searchInput}
             inputRef={searchInputRef}
-            placeholder={i18n.t("tickets.search.placeholder")}
+            placeholder={
+              searchMode === "contacts"
+                ? "Buscar contato por nome ou numero"
+                : i18n.t("tickets.search.placeholder")
+            }
             type="search"
             onChange={handleSearch}
           />
-          <Tooltip placement="top" title="Marque para pesquisar também nos conteúdos das mensagens (mais lento)">
-            <Box className={classes.searchSwitchWrap}>
-              <Switch
-                size="small"
-                checked={searchOnMessages}
-                onChange={(e) => {
-                  setSearchOnMessages(e.target.checked);
-                }}
-              />
-            </Box>
+          {searchMode === "messages" && (
+            <Tooltip placement="top" title="Marque para pesquisar também nos conteúdos das mensagens (mais lento)">
+              <Box className={classes.searchSwitchWrap}>
+                <Switch
+                  size="small"
+                  checked={searchOnMessages}
+                  onChange={(e) => {
+                    setSearchOnMessages(e.target.checked);
+                  }}
+                />
+              </Box>
+            </Tooltip>
+          )}
+          <Tooltip
+            placement="top"
+            title={searchMode === "contacts" ? "Voltar para mensagens" : "Buscar contatos"}
+          >
+            <IconButton
+              size="small"
+              className={`${classes.searchModeButton} ${
+                searchMode === "contacts" ? classes.searchModeButtonActive : ""
+              }`}
+              onClick={handleToggleContactSearch}
+              aria-label={searchMode === "contacts" ? "Voltar para mensagens" : "Buscar contatos"}
+            >
+              <NewMessageIcon style={{ fontSize: 26 }} />
+            </IconButton>
           </Tooltip>
         </Box>
       </div>
 
       <Paper elevation={0} variant="outlined" className={classes.inboxAndQueuesRow}>
         <Box className={classes.inboxFiltersCol} width="100%">
-          {tab !== "search" ? (
+          {tab !== "search" || searchMode === "messages" ? (
             <TicketsInboxFilterBar
               quickFilter={inboxQuickFilter}
               onQuickFilterChange={setInboxQuickFilter}
@@ -550,6 +663,8 @@ const TicketsManagerTabs = () => {
             >
               <TicketsList
                 status="open"
+                searchParam={searchMode === "messages" ? searchParam : ""}
+                searchOnMessages={searchMode === "messages" ? searchOnMessages : false}
                 showAll={false}
                 sortTickets="DESC"
                 selectedQueueIds={selectedQueueIds}
@@ -559,6 +674,7 @@ const TicketsManagerTabs = () => {
                 statusFilter={EMPTY_FILTER_ARRAY}
                 unreadOnly={inboxUnreadOnly}
                 groupsOnly={inboxGroupsOnly}
+                forceSearch={forceSearch}
                 updateCount={(val) => setOpenCount(val)}
                 style={INBOX_TICKETS_LIST_PAPER_STYLE}
                 setTabOpen={setTabOpen}
@@ -572,6 +688,8 @@ const TicketsManagerTabs = () => {
             >
               <TicketsList
                 status="pending"
+                searchParam={searchMode === "messages" ? searchParam : ""}
+                searchOnMessages={searchMode === "messages" ? searchOnMessages : false}
                 selectedQueueIds={selectedQueueIds}
                 sortTickets="DESC"
                 showAll={false}
@@ -581,6 +699,7 @@ const TicketsManagerTabs = () => {
                 statusFilter={EMPTY_FILTER_ARRAY}
                 unreadOnly={inboxUnreadOnly}
                 groupsOnly={inboxGroupsOnly}
+                forceSearch={forceSearch}
                 updateCount={(val) => setPendingCount(val)}
                 style={INBOX_TICKETS_LIST_PAPER_STYLE}
                 setTabOpen={setTabOpen}
@@ -595,6 +714,8 @@ const TicketsManagerTabs = () => {
               >
                 <TicketsList
                   status="group"
+                  searchParam={searchMode === "messages" ? searchParam : ""}
+                  searchOnMessages={searchMode === "messages" ? searchOnMessages : false}
                   showAll={false}
                   sortTickets="DESC"
                   selectedQueueIds={selectedQueueIds}
@@ -604,6 +725,7 @@ const TicketsManagerTabs = () => {
                   statusFilter={EMPTY_FILTER_ARRAY}
                   unreadOnly={inboxUnreadOnly}
                   groupsOnly={inboxGroupsOnly}
+                  forceSearch={forceSearch}
                   updateCount={(val) => setGroupingCount(val)}
                   style={INBOX_TICKETS_LIST_PAPER_STYLE}
                   setTabOpen={setTabOpen}
@@ -618,48 +740,81 @@ const TicketsManagerTabs = () => {
         name="search"
         className={`${classes.ticketsWrapper} ${classes.tabPanelFlex}`}
       >
-        {profile === "admin" && (
+        {searchMode === "contacts" ? (
           <>
-            <TicketsList
-              statusFilter={EMPTY_FILTER_ARRAY}
-              searchParam={searchParam}
-              showAll={false}
-              tags={folderTagsForInbox}
-              users={EMPTY_FILTER_ARRAY}
-              selectedQueueIds={selectedQueueIds}
-              whatsappIds={EMPTY_FILTER_ARRAY}
-              forceSearch={forceSearch}
-              searchOnMessages={searchOnMessages}
-              status="search"
-              unreadOnly="false"
-              groupsOnly="false"
-              allowDragToTagFolder={false}
-            />
+            <Box className={classes.searchSectionHeader}>
+              <PersonAddIcon style={{ fontSize: 14 }} />
+              <span>Iniciar conversa com contato</span>
+              {loadingSearchContacts && (
+                <CircularProgress size={12} style={{ marginLeft: "auto" }} />
+              )}
+            </Box>
+            <Box className={classes.searchContactsBox}>
+              {!loadingSearchContacts && searchContacts.length === 0 ? (
+                <Typography variant="caption" color="textSecondary" className={classes.searchContactsEmpty} component="div">
+                  Nenhum contato encontrado.
+                </Typography>
+              ) : (
+                <List dense disablePadding>
+                  {searchContacts.map((c) => {
+                    const numLabel = (c.number || "").replace(/@.*/, "");
+                    return (
+                      <React.Fragment key={c.id}>
+                        <ListItem
+                          button
+                          className={classes.searchContactItem}
+                          onClick={() => handleStartConversationWithContact(c)}
+                        >
+                          <ListItemAvatar>
+                            <Avatar src={c.urlPicture || c.profilePicUrl || undefined}>
+                              {(c.name || "?").charAt(0).toUpperCase()}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={c.name || "(sem nome)"}
+                            secondary={numLabel || c.email || ""}
+                            secondaryTypographyProps={{ className: classes.searchContactSecondary }}
+                          />
+                        </ListItem>
+                        <Divider component="li" />
+                      </React.Fragment>
+                    );
+                  })}
+                </List>
+              )}
+            </Box>
           </>
-        )}
-
-        {profile === "user" && (
-          <TicketsList
-            statusFilter={EMPTY_FILTER_ARRAY}
-            searchParam={searchParam}
-            showAll={false}
-            tags={folderTagsForInbox}
-            users={EMPTY_FILTER_ARRAY}
-            selectedQueueIds={selectedQueueIds}
-            whatsappIds={EMPTY_FILTER_ARRAY}
-            forceSearch={forceSearch}
-            searchOnMessages={searchOnMessages}
-            status="search"
-            unreadOnly="false"
-            groupsOnly="false"
-            allowDragToTagFolder={false}
-          />
+        ) : (
+          <>
+            <Box className={classes.searchSectionHeader}>
+              <MessageSharpIcon style={{ fontSize: 14 }} />
+              <span>Atendimentos e mensagens</span>
+            </Box>
+            <Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <TicketsList
+                statusFilter={SEARCH_TICKET_STATUS_FILTER}
+                searchParam={searchParam}
+                showAll={false}
+                tags={folderTagsForInbox}
+                users={EMPTY_FILTER_ARRAY}
+                selectedQueueIds={selectedQueueIds}
+                whatsappIds={EMPTY_FILTER_ARRAY}
+                forceSearch={forceSearch}
+                searchOnMessages={searchOnMessages}
+                status="search"
+                unreadOnly="false"
+                groupsOnly="false"
+                allowDragToTagFolder={false}
+              />
+            </Box>
+          </>
         )}
       </TabPanel>
 
       <NewTicketModal
         modalOpen={newTicketModalOpen}
         onClose={handleCloseNewTicketModal}
+        initialContact={newTicketInitialContact}
       />
     </Paper >
   );

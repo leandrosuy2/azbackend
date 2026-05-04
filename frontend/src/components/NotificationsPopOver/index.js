@@ -30,6 +30,28 @@ import { TicketsContext } from "../../context/Tickets/TicketsContext";
 import { isSocketClientReady } from "../../utils/socketClient";
 import { toast } from "react-toastify";
 
+const NOTIFICATIONS_CENTER_STORAGE_KEY = "azchat_notifications_center";
+const KANBAN_NOTIFICATION_KIND = "kanban_move";
+
+function pushCenterNotification(item) {
+	try {
+		if (item?.kind === KANBAN_NOTIFICATION_KIND) {
+			return;
+		}
+		const raw = localStorage.getItem(NOTIFICATIONS_CENTER_STORAGE_KEY);
+		const list = raw ? JSON.parse(raw) : [];
+		const safeList = Array.isArray(list) ? list : [];
+		const next = [
+			item,
+			...safeList.filter((n) => n?.kind !== KANBAN_NOTIFICATION_KIND && String(n.id) !== String(item.id))
+		].slice(0, 80);
+		localStorage.setItem(NOTIFICATIONS_CENTER_STORAGE_KEY, JSON.stringify(next));
+		window.dispatchEvent(new Event("azchat-notifications-updated"));
+	} catch (_) {
+		/* ignore */
+	}
+}
+
 const useStyles = makeStyles(theme => ({
 	tabContainer: {
 		overflowY: "auto",
@@ -191,12 +213,38 @@ const NotificationsPopOver = (volume) => {
 					/* Mantém toast interno; WhatsApp foi tentado em paralelo no servidor. */
 				}
 				const title = data.titulo || "Kanban";
+				const notificationId =
+					data.id ||
+					(data.disparoId != null
+						? `lembrete-disparo-${data.disparoId}`
+						: data.lembreteId != null
+							? `lembrete-${data.lembreteId}-${Date.now()}`
+							: `lembrete-${Date.now()}`);
 				const waHint =
 					data.whatsappErro != null && String(data.whatsappErro).trim() !== ""
 						? ` · WhatsApp: ${data.whatsappErro}`
 						: data.whatsappEnviado
 							? " · WhatsApp enviado"
 							: "";
+				pushCenterNotification({
+					id: notificationId,
+					kind: "lembrete",
+					kindLabel: "Lembrete",
+					title,
+					body: data.body || "",
+					createdAt: new Date().toISOString(),
+					ticketId: data.ticketId ?? null,
+					ticketUuid: data.ticketUuid ?? null,
+					lembreteId: data.lembreteId ?? null,
+					disparoId: data.disparoId ?? null,
+					clientName: data.clientName || "",
+					boardName: data.boardName || "",
+					cardName: data.cardName || "",
+					destinoTipo: data.destinoTipo || "interno",
+					destinoId: data.destinoId ?? null,
+					whatsappEnviado: !!data.whatsappEnviado,
+					whatsappErro: data.whatsappErro || "",
+				});
 				toast.info(
 					<span>
 						<strong>{title}</strong>
@@ -209,7 +257,48 @@ const NotificationsPopOver = (volume) => {
 							</>
 						) : null}
 					</span>,
-					{ autoClose: 9000 }
+					{
+						autoClose: 9000,
+						onClick: () => historyRef.current.push(`/notifications?id=${encodeURIComponent(notificationId)}`)
+					}
+				);
+			};
+
+			const onSystemNotification = (data) => {
+				// TODO(notificacoes-kanban): reativar eventos Kanban em tempo real quando
+				// houver agrupamento/deduplicacao para evitar excesso de notificacoes.
+				if (data?.kind === KANBAN_NOTIFICATION_KIND) return;
+
+				const notificationId = data.id || `notification-${Date.now()}`;
+				const item = {
+					id: notificationId,
+					kind: data.kind || "system",
+					kindLabel: data.kindLabel || "Aviso",
+					title: data.title || "Notificação",
+					body: data.body || "",
+					createdAt: data.createdAt || new Date().toISOString(),
+					ticketId: data.ticketId ?? null,
+					ticketUuid: data.ticketUuid ?? null,
+					logId: data.logId ?? null,
+					clientName: data.clientName || "",
+					boardName: data.boardName || "",
+					cardName: data.cardName || "",
+					fromLabel: data.fromLabel || null,
+					toLabel: data.toLabel || null,
+					userName: data.userName || "",
+					status: data.status || "",
+				};
+				pushCenterNotification(item);
+				toast.info(
+					<span>
+						<strong>{item.title}</strong>
+						<br />
+						{item.body}
+					</span>,
+					{
+						autoClose: 7000,
+						onClick: () => historyRef.current.push(`/notifications?id=${encodeURIComponent(notificationId)}`)
+					}
 				);
 			};
 
@@ -262,6 +351,7 @@ const NotificationsPopOver = (volume) => {
 			socket.on(`company-${companyId}-ticket`, onCompanyTicketNotificationsPopover);
 			socket.on(`company-${companyId}-appMessage`, onCompanyAppMessageNotificationsPopover);
 			socket.on(`company-${companyId}-kanban-lembrete`, onKanbanLembrete);
+			socket.on(`company-${companyId}-system-notification`, onSystemNotification);
 
 			return () => {
 				if (!isSocketClientReady(socket)) return;
@@ -269,6 +359,7 @@ const NotificationsPopOver = (volume) => {
 				socket.off(`company-${companyId}-ticket`, onCompanyTicketNotificationsPopover);
 				socket.off(`company-${companyId}-appMessage`, onCompanyAppMessageNotificationsPopover);
 				socket.off(`company-${companyId}-kanban-lembrete`, onKanbanLembrete);
+				socket.off(`company-${companyId}-system-notification`, onSystemNotification);
 			};
 	}, [user, profile, queues, showTicketWithoutQueue, socket, showNotificationPending, showGroupNotification]);
 

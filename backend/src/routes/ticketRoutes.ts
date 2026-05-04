@@ -21,6 +21,27 @@ const anotacaoUploadOptional = (req: express.Request, res: express.Response, nex
 
 ticketRoutes.get("/tickets", isAuth, TicketController.index);
 
+ticketRoutes.get(
+  "/notifications/lembretes",
+  isAuth,
+  TicketFloatingController.listRecentLembreteNotifications
+);
+ticketRoutes.get(
+  "/notifications/kanban",
+  isAuth,
+  TicketFloatingController.listRecentKanbanNotifications
+);
+ticketRoutes.delete(
+  "/notifications/lembretes/:disparoId",
+  isAuth,
+  TicketFloatingController.deleteLembreteNotification
+);
+ticketRoutes.delete(
+  "/notifications/kanban/:logId",
+  isAuth,
+  TicketFloatingController.deleteKanbanNotification
+);
+
 ticketRoutes.get("/tickets-log/:ticketId", isAuth, TicketController.showLog);
 
 ticketRoutes.get("/ticket/kanban", isAuth, TicketController.kanban);

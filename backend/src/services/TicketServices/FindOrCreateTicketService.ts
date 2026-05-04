@@ -13,6 +13,8 @@ import CompaniesSettings from "../../models/CompaniesSettings";
 import CreateLogTicketService from "./CreateLogTicketService";
 import AppError from "../../errors/AppError";
 import UpdateTicketService from "./UpdateTicketService";
+import ContactTag from "../../models/ContactTag";
+import Tag from "../../models/Tag";
 
 // interface Response {
 //   ticket: Ticket;
@@ -51,6 +53,7 @@ const FindOrCreateTicketService = async (
   const io = getIO();
 
   const DirectTicketsToWallets = settings.DirectTicketsToWallets;
+  let createdTicket = false;
 
   let ticket = await Ticket.findOne({
     where: {
@@ -166,6 +169,7 @@ const FindOrCreateTicketService = async (
     ticket = await Ticket.create(
       ticketData
     );
+    createdTicket = true;
 
     // await FindOrCreateATicketTrakingService({
     //   ticketId: ticket.id,
@@ -184,6 +188,22 @@ const FindOrCreateTicketService = async (
   if (userId != 0 && !isNil(userId)) {
     //Determina qual a fila esse ticket pertence.
     await ticket.update({ userId: userId });
+  }
+
+  if (createdTicket && !groupContact) {
+    const inboxTagsToClear = await Tag.findAll({
+      where: { companyId, kanban: { [Op.in]: [0, 2] } },
+      attributes: ["id"]
+    });
+    const inboxTagIdsToClear = inboxTagsToClear.map(tag => tag.id);
+    if (inboxTagIdsToClear.length > 0) {
+      await ContactTag.destroy({
+        where: {
+          contactId: contact.id,
+          tagId: { [Op.in]: inboxTagIdsToClear }
+        }
+      });
+    }
   }
 
   ticket = await ShowTicketService(ticket.id, companyId);

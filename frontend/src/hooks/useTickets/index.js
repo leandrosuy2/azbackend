@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import toastError from "../../errors/toastError";
 import { format, sub } from 'date-fns'
 import api from "../../services/api";
@@ -27,8 +27,12 @@ const useTickets = ({
   const [hasMore, setHasMore] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [count, setCount] = useState(0);
+  const requestSeq = useRef(0);
 
   useEffect(() => {
+    const seq = requestSeq.current + 1;
+    requestSeq.current = seq;
+    let active = true;
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
       const fetchTickets = async () => {
@@ -54,6 +58,7 @@ const useTickets = ({
             };
 
             const { data } = await api.get("/tickets", { params });
+            if (!active || requestSeq.current !== seq) return;
 
             let tickets = [];
             tickets = data.tickets;
@@ -76,6 +81,7 @@ const useTickets = ({
               });
             }
           } catch (err) {
+            if (!active || requestSeq.current !== seq) return;
             setLoading(false);
             toastError(err);
           }
@@ -99,6 +105,7 @@ const useTickets = ({
                 userId: userFilter
               }
             })
+            if (!active || requestSeq.current !== seq) return;
 
             // console.log(data)
             let tickets = [];
@@ -108,6 +115,7 @@ const useTickets = ({
             setHasMore(null);
             setLoading(false);
           } catch (err) {
+            if (!active || requestSeq.current !== seq) return;
             setLoading(false);
             toastError(err);
           }
@@ -115,7 +123,10 @@ const useTickets = ({
       };
     fetchTickets();
     }, 500);
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      active = false;
+      clearTimeout(delayDebounceFn);
+    };
   }, [
     searchParam,
     tags,

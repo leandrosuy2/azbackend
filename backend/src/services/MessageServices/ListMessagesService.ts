@@ -140,7 +140,12 @@ const ListMessagesService = async ({
     });
   }
 
-  ticketsFilter.push(ticketIds.map((t) => t.id));
+  const ticketIdNumbers = ticketIds.map((t) => t.id);
+  if (Number((ticket as any).userId) === Number(user.id) && !ticketIdNumbers.includes(ticket.id)) {
+    ticketIdNumbers.push(ticket.id);
+  }
+
+  ticketsFilter.push(ticketIdNumbers);
 
   const tickets: number[] = intersection(...ticketsFilter);
 

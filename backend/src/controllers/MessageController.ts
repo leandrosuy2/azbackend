@@ -167,8 +167,17 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
   });
 
   if (queueIdsStringified) {
-    queues = JSON.parse(queueIdsStringified);
-  } else {
+    try {
+      const parsedQueues = JSON.parse(queueIdsStringified);
+      if (Array.isArray(parsedQueues)) {
+        queues = parsedQueues.map(Number).filter(Number.isFinite);
+      }
+    } catch {
+      queues = [];
+    }
+  }
+
+  if (queues.length === 0) {
     user.queues.forEach(queue => {
       queues.push(queue.id);
     });
@@ -261,7 +270,13 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         })
       );
     } else {
+      const hasBody = typeof body === "string" && body.trim().length > 0;
+      const hasVCard = !isNil(vCard);
+
       if (ticket.channel === "whatsapp" && isPrivate === "false") {
+        if (!hasBody && !hasVCard) {
+          return res.send();
+        }
         await SendWhatsAppMessage({ body, ticket, quotedMsg, vCard });
       } else if (ticket.channel === "whatsapp" && isPrivate === "true") {
         const messageData = {
@@ -284,6 +299,9 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         await CreateMessageService({ messageData, companyId: ticket.companyId });
 
       } else if (["facebook", "instagram"].includes(ticket.channel)) {
+        if (!hasBody) {
+          return res.send();
+        }
         const sendText = await sendFaceMessage({ body, ticket, quotedMsg });
 
         await verifyMessageFace(sendText, body, ticket, ticket.contact, true);

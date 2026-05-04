@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Op } from "sequelize";
 import { getIO } from "../libs/socket";
 
 import AppError from "../errors/AppError";
@@ -271,17 +272,41 @@ export const addContactTagLink = async (
     throw new AppError("ERR_NO_TAG_FOUND", 404);
   }
 
+  if (Number(tag.kanban) === 2) {
+    const funnelTags = await Tag.findAll({
+      where: { companyId, kanban: 2 },
+      attributes: ["id"]
+    });
+    const funnelTagIds = funnelTags.map(funnelTag => funnelTag.id);
+    if (funnelTagIds.length > 0) {
+      await ContactTag.destroy({
+        where: {
+          contactId: Number(contactId),
+          tagId: {
+            [Op.in]: funnelTagIds,
+            [Op.ne]: Number(tagId)
+          }
+        }
+      });
+    }
+  }
+
   await ContactTag.findOrCreate({
     where: { contactId: Number(contactId), tagId: Number(tagId) }
+  });
+
+  const updatedContact = await Contact.findOne({
+    where: { id: Number(contactId), companyId },
+    include: ["extraInfo", "tags"]
   });
 
   const io = getIO();
   io.of(String(companyId)).emit(`company-${companyId}-contact`, {
     action: "update",
-    contact
+    contact: updatedContact || contact
   });
 
-  return res.status(200).json({ ok: true });
+  return res.status(200).json({ ok: true, contact: updatedContact || contact });
 };
 
 export const removeContactTag = async (
@@ -291,8 +316,6 @@ export const removeContactTag = async (
   const { tagId, contactId } = req.params;
   const { companyId } = req.user;
 
-  console.log(tagId, contactId)
-
   await ContactTag.destroy({
     where: {
       tagId,
@@ -301,6 +324,10 @@ export const removeContactTag = async (
   });
 
   const tag = await ShowService(tagId);
+  const contact = await Contact.findOne({
+    where: { id: Number(contactId), companyId },
+    include: ["extraInfo", "tags"]
+  });
 
   const io = getIO();
   io.of(String(companyId))
@@ -308,6 +335,12 @@ export const removeContactTag = async (
       action: "update",
       tag
     });
+  if (contact) {
+    io.of(String(companyId)).emit(`company-${companyId}-contact`, {
+      action: "update",
+      contact
+    });
+  }
 
-  return res.status(200).json({ message: "Tag deleted" });
+  return res.status(200).json({ message: "Tag deleted", contact });
 };

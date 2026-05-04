@@ -35,6 +35,7 @@ import PeopleIcon from "@material-ui/icons/People";
 import ListIcon from "@material-ui/icons/ListAlt";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import ForumIcon from "@material-ui/icons/Forum";
+import NotificationsNoneIcon from "@material-ui/icons/NotificationsNone";
 import LocalAtmIcon from "@material-ui/icons/LocalAtm";
 import BusinessIcon from "@material-ui/icons/Business";
 import {
@@ -62,6 +63,30 @@ import useVersion from "../hooks/useVersion";
 import { i18n } from "../translate/i18n";
 import { Campaign, ShapeLine, Webhook } from "@mui/icons-material";
 import { isSocketClientReady } from "../utils/socketClient";
+
+const NOTIFICATIONS_CENTER_STORAGE_KEY = "azchat_notifications_center";
+const NOTIFICATIONS_READ_STORAGE_KEY = "azchat_notifications_read_ids";
+const KANBAN_NOTIFICATION_KIND = "kanban_move";
+
+function readJsonArray(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function mergeNotificationItems(...groups) {
+  const byId = new Map();
+  groups.flat().forEach((item) => {
+    if (!item?.id) return;
+    if (item.kind === KANBAN_NOTIFICATION_KIND) return;
+    byId.set(String(item.id), item);
+  });
+  return Array.from(byId.values());
+}
 
 const useStyles = makeStyles((theme) => ({
   listItem: {
@@ -104,7 +129,7 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 function ListItemLink(props) {
-  const { icon, primary, to, tooltip, showBadge } = props;
+  const { icon, primary, to, tooltip, showBadge, badgeContent } = props;
   const classes = useStyles();
   const { activeMenu } = useActiveMenu();
   const location = useLocation();
@@ -131,7 +156,7 @@ function ListItemLink(props) {
           {icon ? (
             <ListItemIcon>
               {showBadge ? (
-                <Badge badgeContent="!" color="error" overlap="circular" className={classes.badge}>
+                <Badge badgeContent={badgeContent || "!"} color="error" overlap="circular" max={99} className={classes.badge}>
                   <Avatar className={`${classes.iconHoverActive} ${isActive ? "active" : ""}`}>{icon}</Avatar>
                 </Badge>
               ) : (
@@ -234,6 +259,7 @@ const MainListItems = ({ collapsed, drawerClose }) => {
   const [campaignHover, setCampaignHover] = useState(false);
   const [flowHover, setFlowHover] = useState(false);
   const [tutoriaisHover, setTutoriaisHover] = useState(false);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const { list } = useHelps();  // INSERIR
   const [hasHelps, setHasHelps] = useState(false);
 
@@ -263,10 +289,49 @@ const MainListItems = ({ collapsed, drawerClose }) => {
   useEffect(() => {
     if (location.pathname.startsWith("/tickets")) {
       setActiveMenu("/tickets");
+    } else if (location.pathname.startsWith("/notifications")) {
+      setActiveMenu("/notifications");
     } else {
       setActiveMenu("");
     }
   }, [location, setActiveMenu]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const refreshUnreadNotifications = async () => {
+      const localItems = readJsonArray(NOTIFICATIONS_CENTER_STORAGE_KEY).filter(
+        (item) => item?.kind !== KANBAN_NOTIFICATION_KIND
+      );
+      const readIds = new Set(readJsonArray(NOTIFICATIONS_READ_STORAGE_KEY).map(String));
+
+      try {
+        const lembretesRes = await api.get("/notifications/lembretes", { params: { limit: 120 } });
+
+        // TODO(notificacoes-kanban): reativar esta chamada quando os eventos do Kanban
+        // forem agrupados/deduplicados para nao inflar o contador lateral.
+        // const kanbanRes = await api.get("/notifications/kanban", { params: { limit: 120 } });
+
+        if (!mounted) return;
+        const allItems = mergeNotificationItems(
+          localItems,
+          lembretesRes.data?.notifications || []
+          // kanbanRes.data?.notifications || []
+        );
+        setUnreadNotificationsCount(allItems.filter((item) => !readIds.has(String(item.id))).length);
+      } catch (_) {
+        if (!mounted) return;
+        setUnreadNotificationsCount(localItems.filter((item) => !readIds.has(String(item.id))).length);
+      }
+    };
+
+    refreshUnreadNotifications();
+    window.addEventListener("azchat-notifications-updated", refreshUnreadNotifications);
+    return () => {
+      mounted = false;
+      window.removeEventListener("azchat-notifications-updated", refreshUnreadNotifications);
+    };
+  }, []);
 
   const { getPlanCompany } = usePlans();
 
@@ -482,6 +547,15 @@ const MainListItems = ({ collapsed, drawerClose }) => {
         to="/tickets"
         primary={i18n.t("mainDrawer.listItems.tickets")}
         icon={<WhatsAppIcon />}
+        tooltip={collapsed}
+      />
+
+      <ListItemLink
+        to="/notifications"
+        primary="Notificações"
+        icon={<NotificationsNoneIcon />}
+        showBadge={unreadNotificationsCount > 0}
+        badgeContent={unreadNotificationsCount}
         tooltip={collapsed}
       />
 

@@ -19,6 +19,7 @@ import {
   Checkbox,
   FormControlLabel,
   Box,
+  Chip,
   Divider,
   Paper,
   Tooltip,
@@ -34,6 +35,7 @@ import Close from "@material-ui/icons/Close";
 import AttachFile from "@material-ui/icons/AttachFile";
 import Edit from "@material-ui/icons/Edit";
 import DeleteOutline from "@material-ui/icons/DeleteOutline";
+import History from "@material-ui/icons/History";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 
@@ -101,6 +103,47 @@ const useStyles = makeStyles((theme) => ({
   tabPanel: {
     paddingTop: theme.spacing(0),
   },
+  reminderSummary: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: theme.spacing(1),
+    marginBottom: theme.spacing(2),
+  },
+  reminderMetric: {
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: 6,
+    padding: theme.spacing(1),
+    backgroundColor:
+      theme.palette.type === "dark" ? theme.palette.grey[900] : theme.palette.grey[50],
+  },
+  reminderCard: {
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: 6,
+    padding: theme.spacing(1.25),
+    marginBottom: theme.spacing(1),
+    backgroundColor: theme.palette.background.paper,
+  },
+  reminderCardInactive: {
+    opacity: 0.68,
+  },
+  reminderTitleRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: theme.spacing(1),
+  },
+  reminderActions: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: theme.spacing(0.25),
+    flexShrink: 0,
+  },
+  reminderMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    marginTop: theme.spacing(0.75),
+  },
 }));
 
 const LS_PREFIX = "ticket_calendar_";
@@ -131,6 +174,12 @@ export default function TicketFloatingActions({ ticketId }) {
   const [savingAnotacao, setSavingAnotacao] = useState(false);
   const [editAnotacao, setEditAnotacao] = useState(null);
   const [lembretes, setLembretes] = useState([]);
+  const [loadingLembretes, setLoadingLembretes] = useState(false);
+  const [savingLembrete, setSavingLembrete] = useState(false);
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const [historicoTitulo, setHistoricoTitulo] = useState("");
+  const [historicoDisparos, setHistoricoDisparos] = useState([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
 
   const [formEvento, setFormEvento] = useState({
     setor: "consulta",
@@ -156,9 +205,7 @@ export default function TicketFloatingActions({ ticketId }) {
   useEffect(() => {
     if (!ticketId) return;
     const e = loadFromStorage(ticketId, "eventos");
-    const l = loadFromStorage(ticketId, "lembretes");
     if (Array.isArray(e)) setEventos(e);
-    if (Array.isArray(l)) setLembretes(l);
   }, [ticketId]);
 
   const fetchAnotacoes = useCallback(async () => {
@@ -179,6 +226,25 @@ export default function TicketFloatingActions({ ticketId }) {
     if (!modalOpen || !ticketId || activeTab !== 1) return;
     fetchAnotacoes();
   }, [modalOpen, activeTab, ticketId, fetchAnotacoes]);
+
+  const fetchLembretes = useCallback(async () => {
+    if (!ticketId) return;
+    setLoadingLembretes(true);
+    try {
+      const { data } = await api.get(`/tickets/${ticketId}/lembretes`);
+      setLembretes(Array.isArray(data.lembretes) ? data.lembretes : []);
+    } catch (err) {
+      toastError(err);
+      setLembretes([]);
+    } finally {
+      setLoadingLembretes(false);
+    }
+  }, [ticketId]);
+
+  useEffect(() => {
+    if (!modalOpen || !ticketId || activeTab !== 2) return;
+    fetchLembretes();
+  }, [modalOpen, activeTab, ticketId, fetchLembretes]);
 
   const openModal = (tab) => {
     setActiveTab(tab);
@@ -270,25 +336,81 @@ export default function TicketFloatingActions({ ticketId }) {
     }
   };
 
-  const handleCriarLembrete = () => {
+  const handleCriarLembrete = async () => {
     if (!(formLembrete.nome || "").trim() || !formLembrete.data || !formLembrete.hora) return;
-    const novo = {
-      id: "lm_" + Date.now(),
-      ticketId,
-      eventoId: lembreteEventoId,
-      nome: formLembrete.nome.trim(),
-      descricao: formLembrete.descricao || "",
-      data: formLembrete.data,
-      hora: formLembrete.hora,
-      addGoogle: formLembrete.addGoogle,
-      createdAt: new Date().toISOString(),
-    };
-    const next = [...lembretes, novo];
-    setLembretes(next);
-    saveToStorage(ticketId, "lembretes", next);
-    setFormLembrete({ nome: "", descricao: "", data: "", hora: "", addGoogle: false });
-    setLembreteEventoId(null);
+    setSavingLembrete(true);
+    try {
+      await api.post(`/tickets/${ticketId}/lembretes`, {
+        eventoId: lembreteEventoId,
+        nome: formLembrete.nome.trim(),
+        descricao: formLembrete.descricao || null,
+        mensagemTemplate: formLembrete.descricao || null,
+        data: formLembrete.data,
+        hora: formLembrete.hora,
+        addGoogle: formLembrete.addGoogle,
+        tipoGatilho: "agendado",
+        ativo: true,
+        destinoTipo: "interno",
+      });
+      setFormLembrete({ nome: "", descricao: "", data: "", hora: "", addGoogle: false });
+      setLembreteEventoId(null);
+      await fetchLembretes();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSavingLembrete(false);
+    }
   };
+
+  const handleToggleLembrete = async (lm) => {
+    if (!lm?.id) return;
+    setSavingLembrete(true);
+    try {
+      await api.put(`/tickets/${ticketId}/lembretes/${lm.id}`, {
+        ativo: lm.ativo === false,
+      });
+      await fetchLembretes();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSavingLembrete(false);
+    }
+  };
+
+  const handleExcluirLembrete = async (lm) => {
+    if (!lm?.id || !window.confirm("Remover este lembrete?")) return;
+    setSavingLembrete(true);
+    try {
+      await api.delete(`/tickets/${ticketId}/lembretes/${lm.id}`);
+      await fetchLembretes();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSavingLembrete(false);
+    }
+  };
+
+  const handleAbrirHistoricoLembrete = async (lm) => {
+    if (!lm?.id) return;
+    setHistoricoTitulo(lm.nome || "Lembrete");
+    setHistoricoOpen(true);
+    setLoadingHistorico(true);
+    try {
+      const { data } = await api.get(`/tickets/${ticketId}/lembretes/${lm.id}/disparos`);
+      setHistoricoDisparos(Array.isArray(data.disparos) ? data.disparos : []);
+    } catch (err) {
+      toastError(err);
+      setHistoricoDisparos([]);
+    } finally {
+      setLoadingHistorico(false);
+    }
+  };
+
+  const lembretesAtivos = lembretes.filter((lm) => lm.ativo !== false).length;
+  const lembretesInativos = lembretes.length - lembretesAtivos;
+  const proximoLembrete = lembretes
+    .filter((lm) => lm.ativo !== false && lm.data && lm.hora)
+    .sort((a, b) => `${a.data} ${a.hora}`.localeCompare(`${b.data} ${b.hora}`))[0];
 
   const eventosPorSetor = (setorId) => eventos.filter((e) => e.setor === setorId);
 
@@ -571,30 +693,144 @@ export default function TicketFloatingActions({ ticketId }) {
           {activeTab === 2 && (
             <div className={classes.tabPanel}>
               <Typography variant="subtitle2" color="textSecondary" style={{ marginBottom: 12 }}>
-                Criar lembrete vinculado a um evento
+                Criar lembrete do atendimento
               </Typography>
               <TextField fullWidth label="Nome do lembrete" value={formLembrete.nome} onChange={(e) => setFormLembrete({ ...formLembrete, nome: e.target.value })} className={classes.formField} />
-              <TextField fullWidth multiline rows={2} label="Descrição" value={formLembrete.descricao} onChange={(e) => setFormLembrete({ ...formLembrete, descricao: e.target.value })} className={classes.formField} />
+              <TextField fullWidth multiline rows={2} label="Mensagem do lembrete" value={formLembrete.descricao} onChange={(e) => setFormLembrete({ ...formLembrete, descricao: e.target.value })} className={classes.formField} />
               <TextField fullWidth type="date" label="Data" value={formLembrete.data} onChange={(e) => setFormLembrete({ ...formLembrete, data: e.target.value })} InputLabelProps={{ shrink: true }} className={classes.formField} />
               <TextField fullWidth type="time" label="Hora" value={formLembrete.hora} onChange={(e) => setFormLembrete({ ...formLembrete, hora: e.target.value })} InputLabelProps={{ shrink: true }} className={classes.formField} />
               <FormControlLabel control={<Checkbox checked={formLembrete.addGoogle} onChange={(e) => setFormLembrete({ ...formLembrete, addGoogle: e.target.checked })} />} label="Adicionar ao calendário do Google" />
-              <Button variant="contained" color="primary" fullWidth startIcon={<Add />} onClick={handleCriarLembrete} disabled={!formLembrete.nome.trim() || !formLembrete.data || !formLembrete.hora} style={{ marginTop: 8 }}>
-                Criar evento
+              <Button variant="contained" color="primary" fullWidth startIcon={<Add />} onClick={handleCriarLembrete} disabled={savingLembrete || !formLembrete.nome.trim() || !formLembrete.data || !formLembrete.hora} style={{ marginTop: 8 }}>
+                {savingLembrete ? <CircularProgress size={18} color="inherit" /> : "Criar lembrete"}
               </Button>
               <Divider style={{ margin: "24px 0 16px" }} />
-              <Typography variant="subtitle2" style={{ marginBottom: 8 }}>Lembretes</Typography>
-              {lembretes.length === 0 ? (
-                <Typography variant="body2" className={classes.listEmpty}>Nenhum lembrete encontrado</Typography>
+              <Box className={classes.reminderSummary}>
+                <Paper elevation={0} className={classes.reminderMetric}>
+                  <Typography variant="caption" color="textSecondary">Ativos</Typography>
+                  <Typography variant="h6">{lembretesAtivos}</Typography>
+                </Paper>
+                <Paper elevation={0} className={classes.reminderMetric}>
+                  <Typography variant="caption" color="textSecondary">Inativos</Typography>
+                  <Typography variant="h6">{lembretesInativos}</Typography>
+                </Paper>
+                <Paper elevation={0} className={classes.reminderMetric}>
+                  <Typography variant="caption" color="textSecondary">Próximo</Typography>
+                  <Typography variant="body2" noWrap>
+                    {proximoLembrete ? `${proximoLembrete.data} ${proximoLembrete.hora}` : "—"}
+                  </Typography>
+                </Paper>
+              </Box>
+              <Typography variant="subtitle2" style={{ marginBottom: 8 }}>Lembretes salvos</Typography>
+              {loadingLembretes ? (
+                <Box display="flex" justifyContent="center" py={2}>
+                  <CircularProgress size={28} />
+                </Box>
+              ) : lembretes.length === 0 ? (
+                <Typography variant="body2" className={classes.listEmpty}>
+                  Nenhum lembrete salvo para este atendimento.
+                </Typography>
               ) : (
-                <List dense>
+                <Box>
                   {lembretes.map((lm) => (
-                    <ListItem key={lm.id}>
-                      <ListItemText primary={lm.nome} secondary={`${lm.data} ${lm.hora}${lm.addGoogle ? " • Google Calendar" : ""}`} />
-                    </ListItem>
+                    <Paper
+                      key={lm.id}
+                      elevation={0}
+                      className={`${classes.reminderCard} ${lm.ativo === false ? classes.reminderCardInactive : ""}`}
+                    >
+                      <Box className={classes.reminderTitleRow}>
+                        <Box minWidth={0}>
+                          <Typography variant="subtitle2" noWrap title={lm.nome}>
+                            {lm.nome}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            {lm.mensagemTemplate || lm.descricao || "Sem mensagem"}
+                          </Typography>
+                        </Box>
+                        <Box className={classes.reminderActions}>
+                          <Tooltip title={lm.ativo === false ? "Ativar" : "Desativar"}>
+                            <Checkbox
+                              size="small"
+                              checked={lm.ativo !== false}
+                              onChange={() => handleToggleLembrete(lm)}
+                              disabled={savingLembrete}
+                              inputProps={{ "aria-label": lm.ativo === false ? "Ativar lembrete" : "Desativar lembrete" }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="Histórico de disparos">
+                            <IconButton size="small" onClick={() => handleAbrirHistoricoLembrete(lm)} disabled={savingLembrete}>
+                              <History fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Excluir">
+                            <IconButton size="small" onClick={() => handleExcluirLembrete(lm)} disabled={savingLembrete}>
+                              <DeleteOutline fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </Box>
+                      <Box className={classes.reminderMeta}>
+                        <Chip size="small" label={lm.ativo === false ? "Inativo" : "Ativo"} color={lm.ativo === false ? "default" : "primary"} />
+                        <Chip size="small" label={`${lm.data || "sem data"} ${lm.hora || ""}`.trim()} />
+                        <Chip size="small" label={lm.tipoGatilho || "agendado"} variant="outlined" />
+                        {lm.addGoogle ? <Chip size="small" label="Google Calendar" variant="outlined" /> : null}
+                        {lm.ultimoDisparoAt ? <Chip size="small" label={`Último disparo: ${new Date(lm.ultimoDisparoAt).toLocaleString("pt-BR")}`} variant="outlined" /> : null}
+                      </Box>
+                    </Paper>
                   ))}
-                </List>
+                </Box>
               )}
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={historicoOpen}
+        onClose={() => setHistoricoOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle disableTypography style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography variant="h6">Histórico — {historicoTitulo}</Typography>
+          <IconButton onClick={() => setHistoricoOpen(false)} size="small">
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent className={classes.modalContent}>
+          {loadingHistorico ? (
+            <Box display="flex" justifyContent="center" py={2}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : historicoDisparos.length === 0 ? (
+            <Typography variant="body2" className={classes.listEmpty}>
+              Nenhum disparo registrado para este lembrete.
+            </Typography>
+          ) : (
+            <List dense>
+              {historicoDisparos.map((d) => (
+                <ListItem key={d.id} alignItems="flex-start">
+                  <ListItemText
+                    primary={`${new Date(d.createdAt).toLocaleString("pt-BR")} · ${d.status || "—"}`}
+                    secondary={
+                      <span>
+                        <Typography component="span" variant="caption" display="block">
+                          Gatilho: {d.tipoGatilho || "—"} · Interno: {d.canalInterno ? "sim" : "não"} · WhatsApp: {d.canalWhatsapp ? "sim" : "não"}
+                        </Typography>
+                        {d.lembrete?.mensagemTemplate || d.lembrete?.descricao || d.corpo ? (
+                          <Typography component="span" variant="body2" display="block">
+                            {d.lembrete?.mensagemTemplate || d.lembrete?.descricao || d.corpo}
+                          </Typography>
+                        ) : null}
+                        {d.erroWhatsapp ? (
+                          <Typography component="span" variant="caption" color="error" display="block">
+                            {d.erroWhatsapp}
+                          </Typography>
+                        ) : null}
+                      </span>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
           )}
         </DialogContent>
       </Dialog>
