@@ -24,6 +24,7 @@ const CreateQuadroLogService = async (data: CreateQuadroLogData): Promise<Quadro
 
   const log = await QuadroStatusLog.create({
     ticketId: data.ticketId,
+    companyId: data.companyId,
     userId: data.userId,
     fromLaneId: data.fromLaneId ?? null,
     toLaneId: data.toLaneId ?? null,

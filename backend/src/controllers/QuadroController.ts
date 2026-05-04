@@ -28,6 +28,8 @@ import ShareTicketQuadroService from "../services/QuadroServices/ShareTicketQuad
 import MoveTicketQuadroService from "../services/QuadroServices/MoveTicketQuadroService";
 import UpdateMirrorKanbanLaneService from "../services/QuadroServices/UpdateMirrorKanbanLaneService";
 import DispatchKanbanLembreteService from "../services/TicketLembreteServices/DispatchKanbanLembreteService";
+import TicketQuadro from "../models/TicketQuadro";
+import QuadroGroup from "../models/QuadroGroup";
 
 /** Dispara o mesmo evento do UpdateTicketService para o Kanban/chat atualizarem. */
 const emitTicketUpdateForKanban = async (
@@ -286,8 +288,9 @@ export const createLog = async (req: Request, res: Response): Promise<Response> 
   const { ticketId } = req.params;
   const { companyId, id: userId } = req.user;
   const { fromLaneId, toLaneId, fromLabel, toLabel } = req.body;
-  await CreateQuadroLogService({
-    ticketId: parseInt(ticketId, 10),
+  const ticketIdNum = parseInt(ticketId, 10);
+  const log = await CreateQuadroLogService({
+    ticketId: ticketIdNum,
     companyId,
     userId: Number(userId),
     fromLaneId,
@@ -295,6 +298,35 @@ export const createLog = async (req: Request, res: Response): Promise<Response> 
     fromLabel,
     toLabel
   });
+  try {
+    const ticket = await ShowTicketService(ticketIdNum, companyId);
+    const quadro = await TicketQuadro.findOne({
+      where: { ticketId: ticketIdNum },
+      attributes: ["nomeProjeto", "quadroGroupId"],
+      include: [{ model: QuadroGroup, attributes: ["name"], required: false }]
+    });
+    const userName = (req.user as any).name || "Sistema";
+    getIO().of(String(companyId)).to("notification").emit(`company-${companyId}-system-notification`, {
+      id: `kanban-move-${log.id}`,
+      kind: "kanban_move",
+      kindLabel: "Kanban",
+      title: "Cartão movido no Kanban",
+      body: `${userName} moveu o cartão de ${fromLabel || "Sem etapa"} para ${toLabel || "Sem etapa"}.`,
+      createdAt: log.createdAt,
+      ticketId: ticket.id,
+      ticketUuid: ticket.uuid,
+      logId: log.id,
+      clientName: ticket.contact?.name || null,
+      boardName: (quadro as any)?.group?.name || null,
+      cardName: quadro?.nomeProjeto || null,
+      fromLabel: fromLabel || null,
+      toLabel: toLabel || null,
+      userName,
+      status: "ok"
+    });
+  } catch {
+    /* Mantém o log mesmo se a notificação em tempo real falhar. */
+  }
   return res.status(200).json({ ok: true });
 };
 

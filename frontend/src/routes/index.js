@@ -52,6 +52,7 @@ import ResetPassword from "../pages/ResetPassword";
 import Tutoriais from "../pages/Tutoriais";
 import Quadro from "../pages/Quadro";
 import PublicOrcamentoPage from "../pages/PublicOrcamentoPage";
+import NotificationsCenter from "../pages/NotificationsCenter";
 
 
 const Routes = () => {
@@ -81,6 +82,7 @@ const Routes = () => {
                 <Route exact path="/companies" component={Companies} isPrivate />
                 <Route exact path="/" component={Dashboard} isPrivate />
                 <Route exact path="/tickets/:ticketId?" component={TicketResponsiveContainer} isPrivate />
+                <Route exact path="/notifications" component={NotificationsCenter} isPrivate />
                 <Route exact path="/connections" component={Connections} isPrivate />
                 <Route exact path="/quick-messages" component={QuickMessages} isPrivate />
                 <Route exact path="/todolist" component={ToDoList} isPrivate />

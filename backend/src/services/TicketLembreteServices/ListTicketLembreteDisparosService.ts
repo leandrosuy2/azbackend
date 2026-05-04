@@ -17,6 +17,12 @@ const ListTicketLembreteDisparosService = async (
   }
   const disparos = await TicketLembreteDisparo.findAll({
     where: { lembreteId, ticketId, companyId },
+    include: [
+      {
+        model: TicketLembrete,
+        attributes: ["id", "nome", "descricao", "mensagemTemplate"]
+      }
+    ],
     order: [["createdAt", "DESC"]],
     limit: Math.min(Math.max(limit, 1), 100)
   });

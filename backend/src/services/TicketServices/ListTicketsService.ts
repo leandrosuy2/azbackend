@@ -276,61 +276,19 @@ const ListTicketsService = async ({
       // Histórico (closed/nps/lgpd) fica de fora — pode entrar futuramente em uma view dedicada.
       const ACTIVE_SEARCH_STATUSES = ["pending", "open", "group"];
 
-      whereCondition = {
-        companyId
-      }
-      let latestTickets;
-      if (!showTicketAllQueues && user.profile === "user") {
-        latestTickets = await Ticket.findAll({
-          attributes: ['companyId', 'contactId', 'whatsappId', [literal('MAX("id")'), 'id']],
-          where: {
-            status: ACTIVE_SEARCH_STATUSES,
-            ...(effectiveQueueIds.length > 0
-              ? {
-                  queueId:
-                    showAll === "true" || showTicketWithoutQueue
-                      ? { [Op.or]: [effectiveQueueIds, null] }
-                      : { [Op.in]: effectiveQueueIds }
-                }
-              : {}),
-            companyId
-          },
-          group: ['companyId', 'contactId', 'whatsappId'],
-        });
-      } else {
-        let whereCondition2: Filterable["where"] = {
+      const latestTickets = await Ticket.findAll({
+        attributes: ['companyId', 'contactId', 'whatsappId', [literal('MAX("id")'), 'id']],
+        where: {
           companyId,
           status: ACTIVE_SEARCH_STATUSES
-        }
-
-        if (showAll === "false" && user.profile === "admin") {
-          whereCondition2 = {
-            ...whereCondition2,
-            ...(effectiveQueueIds.length > 0 ? { queueId: effectiveQueueIds } : {}),
-          }
-
-        } else if (showAll === "true" && user.profile === "admin") {
-          whereCondition2 = {
-            companyId,
-            status: ACTIVE_SEARCH_STATUSES,
-            ...(effectiveQueueIds.length > 0
-              ? { queueId: { [Op.or]: [effectiveQueueIds, null] } }
-              : {}),
-          }
-        }
-
-        latestTickets = await Ticket.findAll({
-          attributes: ['companyId', 'contactId', 'whatsappId', [literal('MAX("id")'), 'id']],
-          where: whereCondition2,
-          group: ['companyId', 'contactId', 'whatsappId'],
-        });
-
-      }
+        },
+        group: ['companyId', 'contactId', 'whatsappId'],
+      });
 
       const ticketIds = latestTickets.map((t) => t.id);
 
       whereCondition = {
-        ...whereCondition,
+        companyId,
         id: ticketIds,
         status: ACTIVE_SEARCH_STATUSES
       };
@@ -374,7 +332,7 @@ const ListTicketsService = async ({
               attributes: ["id", "body"],
               where: {
                 body: where(
-                  fn("LOWER", fn('unaccent', col("body"))),
+                  fn("LOWER", fn('unaccent', col("messages.body"))),
                   "LIKE",
                   `%${sanitizedSearchParam}%`
                 ),
@@ -396,8 +354,8 @@ const ListTicketsService = async ({
               },
               { "$contact.number$": { [Op.like]: `%${sanitizedSearchParam}%` } },
               {
-                "$message.body$": where(
-                  fn("LOWER", fn("unaccent", col("body"))),
+                "$messages.body$": where(
+                  fn("LOWER", fn("unaccent", col("messages.body"))),
                   "LIKE",
                   `%${sanitizedSearchParam}%`
                 )
@@ -493,13 +451,62 @@ const ListTicketsService = async ({
           ]
         };
 
-        if (status === "group" && (user.allowGroup || showAll === "true")) {
-          whereCondition = {
-            ...whereCondition,
-            queueId: { [Op.or]: [userQueueIds, null] },
-          };
-        }
+      if (status === "group" && (user.allowGroup || showAll === "true")) {
+        whereCondition = {
+          ...whereCondition,
+          queueId: { [Op.or]: [userQueueIds, null] },
+        };
       }
+    }
+
+  if (searchParam && status !== "search") {
+    const sanitizedSearchParam = removeAccents(searchParam.toLocaleLowerCase().trim());
+    const searchOrConditions: any[] = [
+      {
+        "$contact.name$": where(
+          fn("LOWER", fn("unaccent", col("contact.name"))),
+          "LIKE",
+          `%${sanitizedSearchParam}%`
+        )
+      },
+      { "$contact.number$": { [Op.like]: `%${sanitizedSearchParam}%` } }
+    ];
+
+    if (searchOnMessages === "true") {
+      includeCondition = [
+        ...includeCondition,
+        {
+          model: Message,
+          as: "messages",
+          attributes: ["id", "body"],
+          where: {
+            body: where(
+              fn("LOWER", fn("unaccent", col("messages.body"))),
+              "LIKE",
+              `%${sanitizedSearchParam}%`
+            )
+          },
+          required: false,
+          duplicating: false
+        }
+      ];
+
+      searchOrConditions.push({
+        "$messages.body$": where(
+          fn("LOWER", fn("unaccent", col("messages.body"))),
+          "LIKE",
+          `%${sanitizedSearchParam}%`
+        )
+      });
+    }
+
+    whereCondition = {
+      [Op.and]: [
+        whereCondition,
+        { [Op.or]: searchOrConditions }
+      ]
+    };
+  }
 
   if (Array.isArray(tags) && tags.length > 0 && status !== "search") {
     const contactTagsRows = await ContactTag.findAll({

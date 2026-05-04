@@ -14,6 +14,14 @@ import DeleteTicketLembreteService from "../services/TicketLembreteServices/Dele
 import UpdateTicketLembreteService from "../services/TicketLembreteServices/UpdateTicketLembreteService";
 import ListTicketLembreteDisparosService from "../services/TicketLembreteServices/ListTicketLembreteDisparosService";
 import TestKanbanLembreteDispatchService from "../services/TicketLembreteServices/TestKanbanLembreteDispatchService";
+import TicketLembreteDisparo from "../models/TicketLembreteDisparo";
+import TicketLembrete from "../models/TicketLembrete";
+import Ticket from "../models/Ticket";
+import QuadroStatusLog from "../models/QuadroStatusLog";
+import User from "../models/User";
+import Contact from "../models/Contact";
+import TicketQuadro from "../models/TicketQuadro";
+import QuadroGroup from "../models/QuadroGroup";
 import AppError from "../errors/AppError";
 import { resolveTicketIdFromRouteParam } from "../helpers/ResolveTicketIdFromRoute";
 
@@ -213,6 +221,190 @@ export const listLembreteDisparos = async (
     }
     throw e;
   }
+};
+
+export const listRecentLembreteNotifications = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 80, 1), 200);
+
+  const disparos = await TicketLembreteDisparo.findAll({
+    where: { companyId },
+    order: [["createdAt", "DESC"]],
+    limit,
+    include: [
+      {
+        model: TicketLembrete,
+        attributes: ["id", "nome", "descricao", "mensagemTemplate", "destinoTipo", "destinoId"],
+        required: false
+      },
+      {
+        model: Ticket,
+        attributes: ["id", "uuid", "contactId", "quadroGroupId"],
+        required: false,
+        include: [
+          { model: Contact, attributes: ["name"], required: false },
+          { model: QuadroGroup, attributes: ["name"], required: false },
+          {
+            model: TicketQuadro,
+            attributes: ["nomeProjeto", "quadroGroupId"],
+            required: false,
+            include: [{ model: QuadroGroup, attributes: ["name"], required: false }]
+          }
+        ]
+      }
+    ]
+  });
+
+  const notifications = disparos.map(disparo => {
+    const ticket = disparo.ticket as any;
+    const quadro = Array.isArray(ticket?.quadros) ? ticket.quadros[0] : null;
+
+    return {
+      id: `lembrete-disparo-${disparo.id}`,
+      kind: "lembrete",
+      kindLabel: "Lembrete",
+      title: disparo.lembrete?.nome || `Lembrete #${disparo.lembreteId}`,
+      body:
+        disparo.lembrete?.mensagemTemplate ||
+        disparo.lembrete?.descricao ||
+        disparo.corpo ||
+        "",
+      createdAt: disparo.createdAt,
+      ticketId: disparo.ticketId,
+      ticketUuid: disparo.ticket?.uuid || null,
+      lembreteId: disparo.lembreteId,
+      disparoId: disparo.id,
+      clientName: ticket?.contact?.name || null,
+      boardName: quadro?.group?.name || ticket?.quadroGroup?.name || null,
+      cardName: quadro?.nomeProjeto || null,
+      destinoTipo: disparo.lembrete?.destinoTipo || null,
+      destinoId: disparo.lembrete?.destinoId ?? null,
+      whatsappEnviado: !!disparo.canalWhatsapp,
+      whatsappErro: disparo.erroWhatsapp || "",
+      status: disparo.status
+    };
+  });
+
+  return res.status(200).json({ notifications });
+};
+
+export const listRecentKanbanNotifications = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 80, 1), 200);
+
+  const logs = await QuadroStatusLog.findAll({
+    order: [["createdAt", "DESC"]],
+    limit,
+    include: [
+      {
+        model: Ticket,
+        attributes: ["id", "uuid", "companyId", "contactId", "quadroGroupId"],
+        where: { companyId },
+        required: true,
+        include: [
+          { model: Contact, attributes: ["name"], required: false },
+          { model: QuadroGroup, attributes: ["name"], required: false },
+          {
+            model: TicketQuadro,
+            attributes: ["nomeProjeto", "quadroGroupId"],
+            required: false,
+            include: [{ model: QuadroGroup, attributes: ["name"], required: false }]
+          }
+        ]
+      },
+      {
+        model: User,
+        attributes: ["name"],
+        required: false
+      }
+    ]
+  });
+
+  const notifications = logs.map(log => {
+    const ticket = log.ticket as any;
+    const quadro = Array.isArray(ticket?.quadros) ? ticket.quadros[0] : null;
+    const fromLabel = log.fromLabel || "Sem etapa";
+    const toLabel = log.toLabel || "Sem etapa";
+    const userName = log.user?.name || "Sistema";
+
+    return {
+      id: `kanban-move-${log.id}`,
+      kind: "kanban_move",
+      kindLabel: "Kanban",
+      title: "Cartão movido no Kanban",
+      body: `${userName} moveu o cartão de ${fromLabel} para ${toLabel}.`,
+      createdAt: log.createdAt,
+      ticketId: log.ticketId,
+      ticketUuid: log.ticket?.uuid || null,
+      logId: log.id,
+      clientName: ticket?.contact?.name || null,
+      boardName: quadro?.group?.name || ticket?.quadroGroup?.name || null,
+      cardName: quadro?.nomeProjeto || null,
+      fromLabel,
+      toLabel,
+      userName,
+      status: "ok"
+    };
+  });
+
+  return res.status(200).json({ notifications });
+};
+
+export const deleteLembreteNotification = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const id = Number(req.params.disparoId);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: "disparoId inválido" });
+  }
+
+  const deleted = await TicketLembreteDisparo.destroy({
+    where: { id, companyId }
+  });
+
+  if (!deleted) {
+    return res.status(404).json({ error: "Notificação não encontrada" });
+  }
+
+  return res.status(204).send();
+};
+
+export const deleteKanbanNotification = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const id = Number(req.params.logId);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: "logId inválido" });
+  }
+
+  const log = await QuadroStatusLog.findOne({
+    where: { id },
+    include: [
+      {
+        model: Ticket,
+        attributes: ["id", "companyId"],
+        where: { companyId },
+        required: true
+      }
+    ]
+  });
+
+  if (!log) {
+    return res.status(404).json({ error: "Notificação não encontrada" });
+  }
+
+  await log.destroy();
+  return res.status(204).send();
 };
 
 export const testLembreteDispatch = async (

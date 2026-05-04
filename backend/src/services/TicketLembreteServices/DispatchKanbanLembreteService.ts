@@ -5,6 +5,7 @@ import Contact from "../../models/Contact";
 import User from "../../models/User";
 import TicketQuadro from "../../models/TicketQuadro";
 import TicketLembreteDisparo from "../../models/TicketLembreteDisparo";
+import QuadroGroup from "../../models/QuadroGroup";
 import { getIO } from "../../libs/socket";
 import {
   formatKanbanLembreteTemplate,
@@ -68,7 +69,7 @@ const DispatchKanbanLembreteService = async (
 
   const ticket = await Ticket.findOne({
     where: { id: ticketId, companyId },
-    attributes: ["id", "userId", "queueId", "contactId", "whatsappId", "isGroup", "status"],
+    attributes: ["id", "uuid", "userId", "queueId", "contactId", "whatsappId", "isGroup", "status"],
     include: [
       { model: Contact, attributes: ["name"], required: false },
       { model: User, attributes: ["name"], required: false }
@@ -81,7 +82,8 @@ const DispatchKanbanLembreteService = async (
 
   const quadro = await TicketQuadro.findOne({
     where: { ticketId },
-    attributes: ["id", "nomeProjeto"]
+    attributes: ["id", "nomeProjeto", "quadroGroupId"],
+    include: [{ model: QuadroGroup, attributes: ["name"], required: false }]
   });
 
   const nomeCard =
@@ -111,8 +113,11 @@ const DispatchKanbanLembreteService = async (
   const nsp = String(companyId);
 
   for (const lembrete of rows) {
+    const template =
+      lembrete.mensagemTemplate ||
+      (tipoGatilho === "agendado" ? lembrete.descricao : null);
     const body = formatKanbanLembreteTemplate(
-      lembrete.mensagemTemplate,
+      template,
       tipoGatilho,
       vars
     );
@@ -157,26 +162,12 @@ const DispatchKanbanLembreteService = async (
         ? Number(lembrete.destinoId)
         : ticket.userId ?? null;
 
-    io.of(nsp).to("notification").emit(`company-${companyId}-kanban-lembrete`, {
-      ticketId,
-      lembreteId: lembrete.id,
-      titulo: lembrete.nome,
-      body,
-      tipoGatilho,
-      destinoTipo: lembrete.destinoTipo || "interno",
-      destinoId: lembrete.destinoId ?? null,
-      targetUserId,
-      targetQueueId: ticket.queueId ?? null,
-      whatsappEnviado: sentWa,
-      whatsappErro: waErr
-    });
-
     let logStatus = "ok";
     if (dest === "contato_whatsapp" || dest === "whatsapp" || dest === "contato") {
       logStatus = sentWa ? "ok" : waErr ? "ok_interno" : "ok_interno";
     }
 
-    await TicketLembreteDisparo.create({
+    const disparo = await TicketLembreteDisparo.create({
       lembreteId: lembrete.id,
       ticketId,
       companyId,
@@ -186,6 +177,26 @@ const DispatchKanbanLembreteService = async (
       canalWhatsapp: sentWa,
       corpo: body,
       erroWhatsapp: waErr
+    });
+
+    io.of(nsp).to("notification").emit(`company-${companyId}-kanban-lembrete`, {
+      id: `lembrete-disparo-${disparo.id}`,
+      disparoId: disparo.id,
+      ticketId,
+      ticketUuid: ticket.uuid ?? null,
+      lembreteId: lembrete.id,
+      titulo: lembrete.nome,
+      body,
+      clientName: ticket.contact?.name || null,
+      boardName: (quadro as any)?.group?.name || null,
+      cardName: quadro?.nomeProjeto || null,
+      tipoGatilho,
+      destinoTipo: lembrete.destinoTipo || "interno",
+      destinoId: lembrete.destinoId ?? null,
+      targetUserId,
+      targetQueueId: ticket.queueId ?? null,
+      whatsappEnviado: sentWa,
+      whatsappErro: waErr
     });
   }
 };
