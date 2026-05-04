@@ -31,13 +31,20 @@ import { isSocketClientReady } from "../../utils/socketClient";
 import { toast } from "react-toastify";
 
 const NOTIFICATIONS_CENTER_STORAGE_KEY = "azchat_notifications_center";
+const KANBAN_NOTIFICATION_KIND = "kanban_move";
 
 function pushCenterNotification(item) {
 	try {
+		if (item?.kind === KANBAN_NOTIFICATION_KIND) {
+			return;
+		}
 		const raw = localStorage.getItem(NOTIFICATIONS_CENTER_STORAGE_KEY);
 		const list = raw ? JSON.parse(raw) : [];
 		const safeList = Array.isArray(list) ? list : [];
-		const next = [item, ...safeList.filter((n) => String(n.id) !== String(item.id))].slice(0, 80);
+		const next = [
+			item,
+			...safeList.filter((n) => n?.kind !== KANBAN_NOTIFICATION_KIND && String(n.id) !== String(item.id))
+		].slice(0, 80);
 		localStorage.setItem(NOTIFICATIONS_CENTER_STORAGE_KEY, JSON.stringify(next));
 		window.dispatchEvent(new Event("azchat-notifications-updated"));
 	} catch (_) {
@@ -258,6 +265,10 @@ const NotificationsPopOver = (volume) => {
 			};
 
 			const onSystemNotification = (data) => {
+				// TODO(notificacoes-kanban): reativar eventos Kanban em tempo real quando
+				// houver agrupamento/deduplicacao para evitar excesso de notificacoes.
+				if (data?.kind === KANBAN_NOTIFICATION_KIND) return;
+
 				const notificationId = data.id || `notification-${Date.now()}`;
 				const item = {
 					id: notificationId,

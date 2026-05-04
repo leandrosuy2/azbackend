@@ -66,6 +66,7 @@ import { isSocketClientReady } from "../utils/socketClient";
 
 const NOTIFICATIONS_CENTER_STORAGE_KEY = "azchat_notifications_center";
 const NOTIFICATIONS_READ_STORAGE_KEY = "azchat_notifications_read_ids";
+const KANBAN_NOTIFICATION_KIND = "kanban_move";
 
 function readJsonArray(key) {
   try {
@@ -81,6 +82,7 @@ function mergeNotificationItems(...groups) {
   const byId = new Map();
   groups.flat().forEach((item) => {
     if (!item?.id) return;
+    if (item.kind === KANBAN_NOTIFICATION_KIND) return;
     byId.set(String(item.id), item);
   });
   return Array.from(byId.values());
@@ -298,19 +300,23 @@ const MainListItems = ({ collapsed, drawerClose }) => {
     let mounted = true;
 
     const refreshUnreadNotifications = async () => {
-      const localItems = readJsonArray(NOTIFICATIONS_CENTER_STORAGE_KEY);
+      const localItems = readJsonArray(NOTIFICATIONS_CENTER_STORAGE_KEY).filter(
+        (item) => item?.kind !== KANBAN_NOTIFICATION_KIND
+      );
       const readIds = new Set(readJsonArray(NOTIFICATIONS_READ_STORAGE_KEY).map(String));
 
       try {
-        const [lembretesRes, kanbanRes] = await Promise.all([
-          api.get("/notifications/lembretes", { params: { limit: 120 } }),
-          api.get("/notifications/kanban", { params: { limit: 120 } }),
-        ]);
+        const lembretesRes = await api.get("/notifications/lembretes", { params: { limit: 120 } });
+
+        // TODO(notificacoes-kanban): reativar esta chamada quando os eventos do Kanban
+        // forem agrupados/deduplicados para nao inflar o contador lateral.
+        // const kanbanRes = await api.get("/notifications/kanban", { params: { limit: 120 } });
+
         if (!mounted) return;
         const allItems = mergeNotificationItems(
           localItems,
-          lembretesRes.data?.notifications || [],
-          kanbanRes.data?.notifications || []
+          lembretesRes.data?.notifications || []
+          // kanbanRes.data?.notifications || []
         );
         setUnreadNotificationsCount(allItems.filter((item) => !readIds.has(String(item.id))).length);
       } catch (_) {
