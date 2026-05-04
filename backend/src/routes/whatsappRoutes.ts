@@ -19,6 +19,7 @@ whatsappRoutes.get("/whatsapp/all", isAuth, WhatsAppController.listAll);
 
 whatsappRoutes.post("/whatsapp/", isAuth, WhatsAppController.store);
 whatsappRoutes.post("/facebook/", isAuth, WhatsAppController.storeFacebook);
+whatsappRoutes.post("/instagram/direct-login", isAuth, WhatsAppController.storeInstagramDirect);
 whatsappRoutes.post("/instagram/:whatsappId/sync-dms", isAuth, WhatsAppController.syncInstagramDms);
 whatsappRoutes.get("/whatsapp/:whatsappId", isAuth, WhatsAppController.show);
 whatsappRoutes.put("/whatsapp/:whatsappId", isAuth, WhatsAppController.update);

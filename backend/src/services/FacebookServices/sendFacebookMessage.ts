@@ -3,6 +3,10 @@ import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
 import { sendText } from "./graphAPI";
 import formatBody from "../../helpers/Mustache";
+import {
+  isInstagramDirectProvider,
+  sendInstagramText
+} from "../InstagramServices/instagramAPI";
 
 interface Request {
   body: string;
@@ -13,6 +17,24 @@ interface Request {
 const sendFacebookMessage = async ({ body, ticket, quotedMsg }: Request): Promise<any> => {
   const { number } = ticket.contact;
   try {
+    if (
+      ticket.channel === "instagram" &&
+      isInstagramDirectProvider(
+        ticket.whatsapp?.provider,
+        ticket.whatsapp?.facebookUserToken
+      )
+    ) {
+      const send = await sendInstagramText(
+        ticket.whatsapp.facebookPageUserId,
+        number,
+        formatBody(body, ticket),
+        ticket.whatsapp.facebookUserToken
+      );
+
+      await ticket.update({ lastMessage: body });
+
+      return send;
+    }
 
     const send = await sendText(
       number,

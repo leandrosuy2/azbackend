@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 const styles = {
   page: {
@@ -114,19 +114,38 @@ export const TermsOfService = () => (
   </main>
 );
 
-export const MetaCallback = () => (
-  <main style={styles.page}>
-    <section style={styles.container}>
-      <h1 style={styles.title}>Autorizacao Meta</h1>
-      <p style={styles.paragraph}>
-        Se a autorizacao foi concluida, volte para a tela de conexoes do sistema.
-      </p>
-      <p style={styles.paragraph}>
-        <a href="/connections">Abrir conexoes</a>
-      </p>
-    </section>
-  </main>
-);
+export const MetaCallback = () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const isInstagramCallback = window.location.pathname.includes("instagram");
+    const payload = {
+      type: isInstagramCallback ? "instagram-oauth" : "meta-oauth",
+      code: params.get("code"),
+      state: params.get("state"),
+      error: params.get("error") || params.get("error_reason"),
+      errorDescription: params.get("error_description")
+    };
+
+    if (window.opener) {
+      window.opener.postMessage(payload, window.location.origin);
+      window.setTimeout(() => window.close(), 300);
+    }
+  }, []);
+
+  return (
+    <main style={styles.page}>
+      <section style={styles.container}>
+        <h1 style={styles.title}>Autorizacao Meta</h1>
+        <p style={styles.paragraph}>
+          Se a autorizacao foi concluida, volte para a tela de conexoes do sistema.
+        </p>
+        <p style={styles.paragraph}>
+          <a href="/connections">Abrir conexoes</a>
+        </p>
+      </section>
+    </main>
+  );
+};
 
 export const DataDeletion = () => (
   <main style={styles.page}>

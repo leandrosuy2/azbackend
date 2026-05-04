@@ -91,6 +91,12 @@ const useStyles = makeStyles((theme) => ({
 
 const facebookAppId = process.env.REACT_APP_FACEBOOK_APP_ID;
 const facebookApiVersion = process.env.REACT_APP_FACEBOOK_API_VERSION || "25.0";
+const instagramDirectAppId = process.env.REACT_APP_INSTAGRAM_APP_ID;
+const instagramDirectRedirectUri =
+  process.env.REACT_APP_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/instagram/callback`;
+const instagramDirectScope =
+  process.env.REACT_APP_INSTAGRAM_SCOPE ||
+  "instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments";
 const requireBusinessManagement =
   process.env.REACT_APP_REQUIRE_BUSINESS_MANAGEMENT?.toUpperCase() === "TRUE";
 const facebookScope = requireBusinessManagement
@@ -245,6 +251,32 @@ const Connections = () => {
     }
   };
 
+  const handleInstagramDirectLogin = () => {
+    if (!instagramDirectAppId) {
+      toast.error("Configure REACT_APP_INSTAGRAM_APP_ID no frontend.");
+      return;
+    }
+
+    const state = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem("instagramDirectOAuthState", state);
+
+    const params = new URLSearchParams({
+      client_id: instagramDirectAppId,
+      redirect_uri: instagramDirectRedirectUri,
+      response_type: "code",
+      scope: instagramDirectScope,
+      state,
+      force_authentication: "1",
+      enable_fb_login: "0"
+    });
+
+    window.open(
+      `https://www.instagram.com/oauth/authorize?${params.toString()}`,
+      "instagram-direct-login",
+      "width=720,height=760,menubar=no,toolbar=no,status=no"
+    );
+  };
+
   useEffect(() => {
     // const socket = socketManager.GetSocket();
     socket.on(`importMessages-${user.companyId}`, (data) => {
@@ -268,10 +300,42 @@ const Connections = () => {
         toast.error(`Falha ao sincronizar Instagram: ${data.message || "erro desconhecido"}`);
       }
     };
+    const onInstagramOAuth = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "instagram-oauth") return;
+
+      const expectedState = localStorage.getItem("instagramDirectOAuthState");
+      localStorage.removeItem("instagramDirectOAuthState");
+
+      if (event.data.error) {
+        toast.error(event.data.errorDescription || "Login do Instagram cancelado.");
+        return;
+      }
+
+      if (!event.data.code || event.data.state !== expectedState) {
+        toast.error("Retorno do Instagram inválido. Tente conectar novamente.");
+        return;
+      }
+
+      api
+        .post("/instagram/direct-login", {
+          code: event.data.code,
+          redirectUri: instagramDirectRedirectUri
+        })
+        .then(() => {
+          toast.success("Instagram conectado com login direto.");
+        })
+        .catch((error) => {
+          toastError(error);
+        });
+    };
+
     socket.on(`company-${user.companyId}-instagramSync`, onInstagramSync);
+    window.addEventListener("message", onInstagramOAuth);
 
     return () => {
       socket.off(`company-${user.companyId}-instagramSync`, onInstagramSync);
+      window.removeEventListener("message", onInstagramOAuth);
     };
   }, [whatsApps]);
 
@@ -694,6 +758,22 @@ const Connections = () => {
                                 </MenuItem>
                               )}
                             />
+                            <MenuItem
+                              disabled={planConfig?.plan?.useInstagram ? false : true}
+                              onClick={() => {
+                                handleInstagramDirectLogin();
+                                popupState.close();
+                              }}
+                            >
+                              <Instagram
+                                fontSize="small"
+                                style={{
+                                  marginRight: "10px",
+                                  color: "#e1306c",
+                                }}
+                              />
+                              Instagram direto
+                            </MenuItem>
                           </Menu>
                         </>
                       )}

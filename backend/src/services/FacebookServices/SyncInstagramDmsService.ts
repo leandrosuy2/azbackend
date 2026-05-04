@@ -14,6 +14,12 @@ import {
   getInstagramConversations,
   getPageInstagramBusinessAccount
 } from "./graphAPI";
+import {
+  getInstagramDirectConversationMessages,
+  getInstagramDirectConversations,
+  isInstagramDirectProvider,
+  subscribeInstagramDirectApp
+} from "../InstagramServices/instagramAPI";
 
 interface Request {
   instagramWhatsapp: Whatsapp;
@@ -118,7 +124,13 @@ const SyncInstagramDmsService = async ({
     throw new Error("ERR_SYNC_INSTAGRAM_DMS_CHANNEL");
   }
 
-  const facebookWhatsapp = await findFacebookPageConnection(instagramWhatsapp);
+  const isDirectInstagram = isInstagramDirectProvider(
+    instagramWhatsapp.provider,
+    instagramWhatsapp.facebookUserToken
+  );
+  const facebookWhatsapp = isDirectInstagram
+    ? instagramWhatsapp
+    : await findFacebookPageConnection(instagramWhatsapp);
   if (!facebookWhatsapp) {
     throw new Error("ERR_SYNC_INSTAGRAM_DMS_FACEBOOK_PAGE_NOT_FOUND");
   }
@@ -126,13 +138,33 @@ const SyncInstagramDmsService = async ({
   const companyId = instagramWhatsapp.companyId;
   const settings = await CompaniesSettings.findOne({ where: { companyId } });
 
+  if (isDirectInstagram) {
+    try {
+      await subscribeInstagramDirectApp(
+        instagramWhatsapp.facebookPageUserId,
+        instagramWhatsapp.facebookUserToken
+      );
+    } catch (error) {
+      console.warn("[SyncInstagramDms] Instagram direct subscription repair failed", {
+        instagramId: instagramWhatsapp.facebookPageUserId,
+        error: error?.response?.data?.error || error?.message
+      });
+    }
+  }
+
   let conversations: any;
   try {
-    conversations = await getInstagramConversations(
-      facebookWhatsapp.facebookPageUserId,
-      facebookWhatsapp.facebookUserToken,
-      conversationsLimit
-    );
+    conversations = isDirectInstagram
+      ? await getInstagramDirectConversations(
+          instagramWhatsapp.facebookPageUserId,
+          instagramWhatsapp.facebookUserToken,
+          conversationsLimit
+        )
+      : await getInstagramConversations(
+          facebookWhatsapp.facebookPageUserId,
+          facebookWhatsapp.facebookUserToken,
+          conversationsLimit
+        );
   } catch (err: any) {
     const fbError = err?.response?.data?.error;
     console.error("[SyncInstagramDms] Graph API error", {
@@ -201,11 +233,17 @@ const SyncInstagramDmsService = async ({
       );
     }
 
-    const messages = await getConversationMessages(
-      conversation.id,
-      facebookWhatsapp.facebookUserToken,
-      messagesLimit
-    );
+    const messages = isDirectInstagram
+      ? await getInstagramDirectConversationMessages(
+          conversation.id,
+          instagramWhatsapp.facebookUserToken,
+          messagesLimit
+        )
+      : await getConversationMessages(
+          conversation.id,
+          facebookWhatsapp.facebookUserToken,
+          messagesLimit
+        );
 
     const orderedMessages = [...(messages.data || [])].reverse();
     let lastMessage = ticket.lastMessage || "";

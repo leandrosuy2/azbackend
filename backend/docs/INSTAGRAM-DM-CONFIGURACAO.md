@@ -53,8 +53,11 @@ BACKEND_URL=https://api.seu-dominio.com
 FRONTEND_URL=https://app.seu-dominio.com
 FACEBOOK_APP_ID=seu_app_id
 FACEBOOK_APP_SECRET=seu_app_secret
+INSTAGRAM_APP_ID=seu_instagram_app_id
+INSTAGRAM_APP_SECRET=seu_instagram_app_secret
 VERIFY_TOKEN=um_token_forte_para_webhook
 META_GRAPH_API_VERSION=v25.0
+INSTAGRAM_GRAPH_API_VERSION=v25.0
 META_REQUIRE_WEBHOOK_SIGNATURE=true
 ```
 
@@ -65,6 +68,9 @@ REACT_APP_BACKEND_URL=https://api.seu-dominio.com
 REACT_APP_FACEBOOK_APP_ID=seu_app_id
 REACT_APP_FACEBOOK_API_VERSION=25.0
 REACT_APP_REQUIRE_BUSINESS_MANAGEMENT=true
+REACT_APP_INSTAGRAM_APP_ID=seu_instagram_app_id
+REACT_APP_INSTAGRAM_REDIRECT_URI=https://app.seu-dominio.com/instagram/callback
+REACT_APP_INSTAGRAM_SCOPE=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments
 ```
 
 Notas:

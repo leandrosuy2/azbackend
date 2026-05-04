@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import crypto from "crypto";
+import { Op } from "sequelize";
 import Whatsapp from "../models/Whatsapp";
 import { handleMessage } from "../services/FacebookServices/facebookMessageListener";
 import logger from "../utils/logger";
@@ -66,22 +67,35 @@ export const webHook = async (
     if (body.object === "page" || body.object === "instagram") {
       const channel = body.object === "page" ? "facebook" : "instagram";
 
-      body.entry?.forEach(async (entry: any) => {
+      for (const entry of body.entry || []) {
+        const messagingItems = [
+          ...(entry.messaging || []),
+          ...((entry.changes || []).map((change: any) => change?.value || change).filter(Boolean))
+        ];
+        const lookupIds = [
+          entry.id,
+          ...messagingItems.flatMap((item: any) => [
+            item?.recipient?.id,
+            item?.value?.recipient?.id
+          ])
+        ].filter(Boolean);
+
         const getTokenPage = await Whatsapp.findOne({
           where: {
-            facebookPageUserId: entry.id,
+            facebookPageUserId: {
+              [Op.in]: lookupIds.length ? lookupIds : [entry.id]
+            },
             channel
           }
         });
 
         if (!getTokenPage) {
           logger.warn(
-            `[Meta Webhook] Nenhuma conexão ${channel} encontrada para entry.id=${entry.id}. Verifique se a conexão foi criada com o ID correto (Instagram Business Account ID para canal instagram, Facebook Page ID para canal facebook).`
+            `[Meta Webhook] Nenhuma conexão ${channel} encontrada para ids=${lookupIds.join(",") || entry.id}. Verifique se a conexão foi criada com o ID correto (Instagram Business Account ID para canal instagram, Facebook Page ID para canal facebook).`
           );
-          return;
+          continue;
         }
 
-        const messagingItems = entry.messaging || entry.changes || [];
         logger.info(
           `[Meta Webhook] ${channel} whatsappId=${getTokenPage.id} companyId=${getTokenPage.companyId} eventos=${messagingItems.length}`
         );
@@ -89,7 +103,7 @@ export const webHook = async (
         messagingItems.forEach((data: any) => {
           handleMessage(getTokenPage, data, channel, getTokenPage.companyId);
         });
-      });
+      }
 
       return res.status(200).json({
         message: "EVENT_RECEIVED"

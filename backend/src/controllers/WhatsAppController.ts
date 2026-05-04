@@ -24,6 +24,12 @@ import ListAllWhatsAppsService from "../services/WhatsappService/ListAllWhatsApp
 import ListFilterWhatsAppsService from "../services/WhatsappService/ListFilterWhatsAppsService";
 import User from "../models/User";
 import SyncInstagramDmsService from "../services/FacebookServices/SyncInstagramDmsService";
+import {
+  exchangeForLongLivedInstagramToken,
+  exchangeInstagramCodeForToken,
+  getInstagramMe,
+  subscribeInstagramDirectApp
+} from "../services/InstagramServices/instagramAPI";
 
 interface WhatsappData {
   name: string;
@@ -352,6 +358,122 @@ export const storeFacebook = async (
     console.log(error);
     return res.status(400).json({
       error: error?.message || "Erro ao conectar Facebook/Instagram"
+    });
+  }
+};
+
+export const storeInstagramDirect = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    const {
+      code,
+      redirectUri
+    }: {
+      code: string;
+      redirectUri: string;
+    } = req.body;
+    const { companyId } = req.user;
+
+    if (!code || !redirectUri) {
+      return res.status(400).json({
+        error: "Código de autorização do Instagram ausente."
+      });
+    }
+
+    const shortLivedTokenData = await exchangeInstagramCodeForToken(code, redirectUri);
+    const shortLivedToken = shortLivedTokenData.access_token;
+    let instagramAccessToken = shortLivedToken;
+    let instagramProfile: any = {};
+
+    try {
+      instagramAccessToken = await exchangeForLongLivedInstagramToken(shortLivedToken);
+    } catch (error) {
+      console.warn("[storeInstagramDirect] long-lived token exchange failed; using short-lived token", {
+        error: error?.response?.data?.error || error?.message
+      });
+    }
+
+    try {
+      instagramProfile = await getInstagramMe(instagramAccessToken);
+    } catch (error) {
+      console.warn("[storeInstagramDirect] profile fetch failed; using token response user_id", {
+        error: error?.response?.data?.error || error?.message
+      });
+    }
+
+    const instagramUserId =
+      String(instagramProfile.user_id || instagramProfile.id || shortLivedTokenData.user_id || "");
+
+    if (!instagramUserId) {
+      return res.status(400).json({
+        error: "Não foi possível identificar a conta Instagram autorizada."
+      });
+    }
+
+    try {
+      await subscribeInstagramDirectApp(instagramUserId, instagramAccessToken);
+    } catch (error) {
+      console.warn("[storeInstagramDirect] webhook subscription failed", {
+        instagramUserId,
+        error: error?.response?.data?.error || error?.message
+      });
+    }
+
+    const pageConection = {
+      companyId,
+      name: `Insta ${instagramProfile.username || instagramUserId}`,
+      facebookUserId: instagramUserId,
+      facebookPageUserId: instagramUserId,
+      facebookUserToken: instagramAccessToken,
+      tokenMeta: shortLivedToken,
+      provider: "instagram_direct",
+      isDefault: false,
+      channel: "instagram",
+      status: "CONNECTED",
+      greetingMessage: "",
+      farewellMessage: "",
+      queueIds: [],
+      isMultidevice: false
+    };
+
+    let connection: Whatsapp;
+    const exist = await Whatsapp.findOne({
+      where: {
+        facebookPageUserId: pageConection.facebookPageUserId,
+        channel: "instagram",
+        companyId
+      }
+    });
+
+    if (exist) {
+      await exist.update({
+        facebookUserId: pageConection.facebookUserId,
+        facebookUserToken: pageConection.facebookUserToken,
+        tokenMeta: pageConection.tokenMeta,
+        provider: pageConection.provider,
+        status: "CONNECTED",
+        channel: pageConection.channel
+      });
+      connection = exist;
+    } else {
+      const created = await CreateWhatsAppService(pageConection);
+      connection = created.whatsapp;
+    }
+
+    const io = getIO();
+    io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+      action: "update",
+      whatsapp: connection
+    });
+
+    return res.status(200).json({ ok: true, whatsapp: connection });
+  } catch (error) {
+    console.log(error);
+    const metaError = error?.response?.data?.error;
+    return res.status(400).json({
+      error: metaError?.message || error?.message || "Erro ao conectar Instagram direto"
     });
   }
 };

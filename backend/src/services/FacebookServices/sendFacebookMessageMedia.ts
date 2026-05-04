@@ -1,6 +1,10 @@
 import AppError from "../../errors/AppError";
 import Ticket from "../../models/Ticket";
 import { sendAttachmentFromUrl } from "./graphAPI";
+import {
+  isInstagramDirectProvider,
+  sendInstagramAttachmentFromUrl
+} from "../InstagramServices/instagramAPI";
 // import { verifyMessage } from "./facebookMessageListener";
 
 interface Request {
@@ -34,6 +38,25 @@ export const sendFacebookMessageMedia = async ({
 
     const domain = `${process.env.BACKEND_URL}/public/company${ticket.companyId}/${media.filename}`
 
+    if (
+      ticket.channel === "instagram" &&
+      isInstagramDirectProvider(
+        ticket.whatsapp?.provider,
+        ticket.whatsapp?.facebookUserToken
+      )
+    ) {
+      const sendMessage = await sendInstagramAttachmentFromUrl(
+        ticket.whatsapp.facebookPageUserId,
+        ticket.contact.number,
+        domain,
+        type,
+        ticket.whatsapp.facebookUserToken
+      );
+
+      await ticket.update({ lastMessage: media.filename });
+
+      return sendMessage;
+    }
 
     const sendMessage = await sendAttachmentFromUrl(
       ticket.contact.number,
@@ -59,6 +82,28 @@ export const sendFacebookMessageMediaExternal = async ({
     const type = "image"
 
     // const domain = `${process.env.BACKEND_URL}/public/${media.filename}`
+
+    if (
+      ticket.channel === "instagram" &&
+      isInstagramDirectProvider(
+        ticket.whatsapp?.provider,
+        ticket.whatsapp?.facebookUserToken
+      )
+    ) {
+      const sendMessage = await sendInstagramAttachmentFromUrl(
+        ticket.whatsapp.facebookPageUserId,
+        ticket.contact.number,
+        url,
+        type,
+        ticket.whatsapp.facebookUserToken
+      );
+
+      const randomName = Math.random().toString(36).substring(7);
+
+      await ticket.update({ lastMessage: body ||  `${randomName}.jpg}`});
+
+      return sendMessage;
+    }
 
     const sendMessage = await sendAttachmentFromUrl(
       ticket.contact.number,
@@ -88,6 +133,28 @@ export const sendFacebookMessageFileExternal = async ({
     const type = "file"
 
     // const domain = `${process.env.BACKEND_URL}/public/${media.filename}`
+
+    if (
+      ticket.channel === "instagram" &&
+      isInstagramDirectProvider(
+        ticket.whatsapp?.provider,
+        ticket.whatsapp?.facebookUserToken
+      )
+    ) {
+      const sendMessage = await sendInstagramAttachmentFromUrl(
+        ticket.whatsapp.facebookPageUserId,
+        ticket.contact.number,
+        url,
+        type,
+        ticket.whatsapp.facebookUserToken
+      );
+
+      const randomName = Math.random().toString(36).substring(7);
+
+      await ticket.update({ lastMessage: body ||  `${randomName}.pdf}`});
+
+      return sendMessage;
+    }
 
     const sendMessage = await sendAttachmentFromUrl(
       ticket.contact.number,
