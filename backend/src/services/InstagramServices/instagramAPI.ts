@@ -11,6 +11,11 @@ const instagramApiVersion = normalizeVersion(
 );
 const instagramGraphBaseUrl = `https://graph.instagram.com/${instagramApiVersion}/`;
 
+export interface InstagramRefreshResult {
+  accessToken: string;
+  expiresInSeconds: number;
+}
+
 const getInstagramAppCredentials = () => {
   const appId = process.env.INSTAGRAM_APP_ID;
   const appSecret = process.env.INSTAGRAM_APP_SECRET;
@@ -66,7 +71,7 @@ export const exchangeInstagramCodeForToken = async (
 
 export const exchangeForLongLivedInstagramToken = async (
   shortLivedToken: string
-): Promise<string> => {
+): Promise<InstagramRefreshResult> => {
   const { appSecret } = getInstagramAppCredentials();
   const { data } = await axios.get("https://graph.instagram.com/access_token", {
     params: {
@@ -76,7 +81,31 @@ export const exchangeForLongLivedInstagramToken = async (
     }
   });
 
-  return data.access_token;
+  return {
+    accessToken: data.access_token,
+    expiresInSeconds: Number(data.expires_in) || 0
+  };
+};
+
+/**
+ * Estende um token long-lived do Instagram por mais ~60 dias.
+ * A Graph API só aceita ig_refresh_token quando o token tem pelo menos 24h
+ * de vida; tokens recém-trocados não podem ser renovados imediatamente.
+ */
+export const refreshInstagramLongLivedToken = async (
+  longLivedToken: string
+): Promise<InstagramRefreshResult> => {
+  const { data } = await axios.get("https://graph.instagram.com/refresh_access_token", {
+    params: {
+      grant_type: "ig_refresh_token",
+      access_token: longLivedToken
+    }
+  });
+
+  return {
+    accessToken: data.access_token,
+    expiresInSeconds: Number(data.expires_in) || 0
+  };
 };
 
 export const getInstagramMe = async (token: string): Promise<any> => {

@@ -385,10 +385,15 @@ export const storeInstagramDirect = async (
     const shortLivedTokenData = await exchangeInstagramCodeForToken(code, redirectUri);
     const shortLivedToken = shortLivedTokenData.access_token;
     let instagramAccessToken = shortLivedToken;
+    let tokenMetaExpiresAt: Date | null = null;
     let instagramProfile: any = {};
 
     try {
-      instagramAccessToken = await exchangeForLongLivedInstagramToken(shortLivedToken);
+      const longLived = await exchangeForLongLivedInstagramToken(shortLivedToken);
+      instagramAccessToken = longLived.accessToken;
+      if (longLived.expiresInSeconds > 0) {
+        tokenMetaExpiresAt = new Date(Date.now() + longLived.expiresInSeconds * 1000);
+      }
     } catch (error) {
       console.warn("[storeInstagramDirect] long-lived token exchange failed; using short-lived token", {
         error: error?.response?.data?.error || error?.message
@@ -428,6 +433,7 @@ export const storeInstagramDirect = async (
       facebookPageUserId: instagramUserId,
       facebookUserToken: instagramAccessToken,
       tokenMeta: shortLivedToken,
+      tokenMetaExpiresAt,
       provider: "instagram_direct",
       isDefault: false,
       channel: "instagram",
@@ -452,6 +458,7 @@ export const storeInstagramDirect = async (
         facebookUserId: pageConection.facebookUserId,
         facebookUserToken: pageConection.facebookUserToken,
         tokenMeta: pageConection.tokenMeta,
+        tokenMetaExpiresAt: pageConection.tokenMetaExpiresAt,
         provider: pageConection.provider,
         status: "CONNECTED",
         channel: pageConection.channel

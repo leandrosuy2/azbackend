@@ -125,6 +125,12 @@ class Whatsapp extends Model<Whatsapp> {
   @Column(DataType.TEXT)
   tokenMeta: string;
 
+  @Column(DataType.DATE)
+  tokenMetaExpiresAt: Date;
+
+  @Column(DataType.TEXT)
+  metaConnectionError: string;
+
   @Column(DataType.TEXT)
   channel: string;
 

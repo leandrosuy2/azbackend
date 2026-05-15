@@ -66,16 +66,16 @@ const server = app.listen(PORT, async () => {
 process.on("uncaughtException", err => {
   console.error(`${new Date().toUTCString()} uncaughtException:`, err.message);
   console.error(err.stack);
-  process.exit(1);
+  setTimeout(() => process.exit(1), 500);
 });
 
 process.on("unhandledRejection", (reason, p) => {
   console.error(
     `${new Date().toUTCString()} unhandledRejection:`,
-    reason,
+    reason instanceof Error ? reason.stack : reason,
     p
   );
-  process.exit(1);
+  setTimeout(() => process.exit(1), 500);
 });
 
 // cron.schedule("* * * * * *", async () => {

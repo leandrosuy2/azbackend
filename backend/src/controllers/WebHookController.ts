@@ -5,22 +5,13 @@ import Whatsapp from "../models/Whatsapp";
 import { handleMessage } from "../services/FacebookServices/facebookMessageListener";
 import logger from "../utils/logger";
 
-const isWebhookSignatureValid = (req: Request): boolean => {
-  const appSecret = process.env.FACEBOOK_APP_SECRET;
-  const signature = req.header("x-hub-signature-256");
-  const requireSignature =
-    process.env.META_REQUIRE_WEBHOOK_SIGNATURE === "true" ||
-    process.env.FACEBOOK_VALIDATE_WEBHOOK_SIGNATURE === "true";
-
-  if (!appSecret || !signature) {
-    return !requireSignature;
-  }
-
-  const rawBody = (req as any).rawBody;
-  if (!rawBody) return false;
-
+const matchesSignature = (
+  signature: string,
+  rawBody: string,
+  secret: string
+): boolean => {
   const expectedSignature = `sha256=${crypto
-    .createHmac("sha256", appSecret)
+    .createHmac("sha256", secret)
     .update(rawBody)
     .digest("hex")}`;
 
@@ -30,6 +21,38 @@ const isWebhookSignatureValid = (req: Request): boolean => {
   if (signatureBuffer.length !== expectedBuffer.length) return false;
 
   return crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+};
+
+const isWebhookSignatureValid = (req: Request): boolean => {
+  const requireSignature =
+    process.env.META_REQUIRE_WEBHOOK_SIGNATURE === "true" ||
+    process.env.FACEBOOK_VALIDATE_WEBHOOK_SIGNATURE === "true";
+
+  // O mesmo endpoint recebe webhooks de dois apps Meta distintos
+  // (Facebook Graph e Instagram Login), assinados com secrets diferentes.
+  const secrets = [
+    process.env.FACEBOOK_APP_SECRET,
+    process.env.INSTAGRAM_APP_SECRET
+  ].filter(Boolean) as string[];
+
+  const signature = req.header("x-hub-signature-256");
+
+  // Sem validação obrigatória configurada, não bloquear a entrega:
+  // tokens/secrets divergentes não devem derrubar mensagens reais.
+  if (!requireSignature) {
+    return true;
+  }
+
+  if (!secrets.length || !signature) {
+    return !requireSignature;
+  }
+
+  const rawBody = (req as any).rawBody;
+  if (!rawBody) return false;
+
+  return secrets.some(secret =>
+    matchesSignature(signature, rawBody, secret)
+  );
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -63,6 +86,8 @@ export const webHook = async (
 
     const { body } = req;
     logger.info(`[Meta Webhook] object=${body?.object} entries=${body?.entry?.length || 0}`);
+    // DEBUG TEMPORÁRIO — remover após depurar recepção IG
+    logger.info(`[Meta Webhook][DEBUG] payload=${JSON.stringify(body)}`);
 
     if (body.object === "page" || body.object === "instagram") {
       const channel = body.object === "page" ? "facebook" : "instagram";
@@ -114,6 +139,9 @@ export const webHook = async (
       message: body
     });
   } catch (error) {
+    logger.error(
+      `[Meta Webhook] erro ao processar evento: ${error?.message || error}`
+    );
     return res.status(500).json({
       message: error
     });

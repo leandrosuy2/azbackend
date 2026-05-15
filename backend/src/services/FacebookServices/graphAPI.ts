@@ -159,6 +159,18 @@ export const genText = (text: string): any => {
   return response;
 };
 
+/**
+ * Valida um token de página/usuário do Facebook chamando /me.
+ * Diferente de getProfile, NÃO mascara o erro: relança o erro original
+ * do axios para que o chamador inspecione status HTTP e código da Meta.
+ */
+export const validateFacebookToken = async (token: string): Promise<any> => {
+  const { data } = await apiBase(token).get("me", {
+    params: { fields: "id,name" }
+  });
+  return data;
+};
+
 export const getProfile = async (id: string, token: string): Promise<any> => {
   try {
     const { data } = await apiBase(token).get(id);
