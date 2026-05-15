@@ -86,8 +86,6 @@ export const webHook = async (
 
     const { body } = req;
     logger.info(`[Meta Webhook] object=${body?.object} entries=${body?.entry?.length || 0}`);
-    // DEBUG TEMPORÁRIO — remover após depurar recepção IG
-    logger.info(`[Meta Webhook][DEBUG] payload=${JSON.stringify(body)}`);
 
     if (body.object === "page" || body.object === "instagram") {
       const channel = body.object === "page" ? "facebook" : "instagram";
