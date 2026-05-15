@@ -17,3 +17,5 @@ docs/SINCRONIZAR-BANCO-PRODUCAO-PARA-LOCAL.md
 azvdodesigner_dump.sql
 public/company*
 public/announcements
+postgres_data*
+postgres18_data*

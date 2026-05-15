@@ -63,6 +63,8 @@ const downloadProfileImage = async ({
     fs.chmodSync(folder, 0o777);
   }
 
+  if (!profilePicUrl) return filename;
+
   try {
     const response = await axios.get(profilePicUrl, {
       responseType: 'arraybuffer'
@@ -346,16 +348,18 @@ const CreateOrUpdateContactService = async ({
 
       await contact.reload();
     } else if (['facebook', 'instagram'].includes(channel)) {
-      let filename = await downloadProfileImage({
-        profilePicUrl,
-        companyId,
-        contact
-      });
+      if (profilePicUrl) {
+        let filename = await downloadProfileImage({
+          profilePicUrl,
+          companyId,
+          contact
+        });
 
-      await contact.update({
-        urlPicture: filename,
-        pictureUpdated: true
-      });
+        await contact.update({
+          urlPicture: filename,
+          pictureUpdated: true
+        });
+      }
 
       await contact.reload();
     }

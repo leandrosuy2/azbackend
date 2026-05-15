@@ -3,11 +3,12 @@ import FormData from "form-data";
 import { createReadStream } from "fs";
 import logger from "../../utils/logger";
 
-const formData: FormData = new FormData();
+const graphApiVersion = process.env.META_GRAPH_API_VERSION || "v25.0";
+const graphApiBaseUrl = `https://graph.facebook.com/${graphApiVersion}/`;
 
 const apiBase = (token: string) =>
   axios.create({
-    baseURL: "https://graph.facebook.com/v18.0/",
+    baseURL: graphApiBaseUrl,
     params: {
       access_token: token
     }
@@ -15,7 +16,7 @@ const apiBase = (token: string) =>
 
 export const getAccessToken = async (): Promise<string> => {
   const { data } = await axios.get(
-    "https://graph.facebook.com/v18.0/oauth/access_token",
+    `${graphApiBaseUrl}oauth/access_token`,
     {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
@@ -76,6 +77,7 @@ export const sendText = async (
     return data;
   } catch (error) {
     console.log(error);
+    throw error;
   }
 };
 
@@ -103,6 +105,7 @@ export const sendAttachmentFromUrl = async (
     return data;
   } catch (error) {
     console.log(error);
+    throw error;
   }
 };
 
@@ -112,6 +115,8 @@ export const sendAttachment = async (
   type: string,
   token: string
 ): Promise<void> => {
+  const formData: FormData = new FormData();
+
   formData.append(
     "recipient",
     JSON.stringify({
@@ -154,6 +159,18 @@ export const genText = (text: string): any => {
   return response;
 };
 
+/**
+ * Valida um token de página/usuário do Facebook chamando /me.
+ * Diferente de getProfile, NÃO mascara o erro: relança o erro original
+ * do axios para que o chamador inspecione status HTTP e código da Meta.
+ */
+export const validateFacebookToken = async (token: string): Promise<any> => {
+  const { data } = await apiBase(token).get("me", {
+    params: { fields: "id,name" }
+  });
+  return data;
+};
+
 export const getProfile = async (id: string, token: string): Promise<any> => {
   try {
     const { data } = await apiBase(token).get(id);
@@ -180,22 +197,64 @@ export const getPageProfile = async (
   }
 };
 
+export const getPageInstagramBusinessAccount = async (
+  pageId: string,
+  token: string
+): Promise<any> => {
+  const { data } = await apiBase(token).get(
+    `${pageId}?fields=instagram_business_account{id,username,name}`
+  );
+
+  return data.instagram_business_account;
+};
+
+export const getInstagramConversations = async (
+  pageId: string,
+  token: string,
+  limit = 25
+): Promise<any> => {
+  const { data } = await apiBase(token).get(`${pageId}/conversations`, {
+    params: {
+      platform: "instagram",
+      fields: "id,updated_time,participants",
+      limit
+    }
+  });
+
+  return data;
+};
+
+export const getConversationMessages = async (
+  conversationId: string,
+  token: string,
+  limit = 25
+): Promise<any> => {
+  const { data } = await apiBase(token).get(`${conversationId}/messages`, {
+    params: {
+      fields: "id,message,from,to,created_time,attachments",
+      limit
+    }
+  });
+
+  return data;
+};
+
 export const profilePsid = async (id: string, token: string): Promise<any> => {
   try {
     const { data } = await axios.get(
-      `https://graph.facebook.com/v18.0/${id}?access_token=${token}`
+      `${graphApiBaseUrl}${id}?access_token=${token}`
     );
     return data;
   } catch (error) {
     console.log(error);
-    await getProfile(id, token);
+    return getProfile(id, token);
   }
 };
 
 export const subscribeApp = async (id: string, token: string): Promise<any> => {
   try {
     const { data } = await axios.post(
-      `https://graph.facebook.com/v18.0/${id}/subscribed_apps?access_token=${token}`,
+      `${graphApiBaseUrl}${id}/subscribed_apps?access_token=${token}`,
       {
         subscribed_fields: [
           "messages",
@@ -219,7 +278,7 @@ export const unsubscribeApp = async (
 ): Promise<any> => {
   try {
     const { data } = await axios.delete(
-      `https://graph.facebook.com/v18.0/${id}/subscribed_apps?access_token=${token}`
+      `${graphApiBaseUrl}${id}/subscribed_apps?access_token=${token}`
     );
     return data;
   } catch (error) {
@@ -246,9 +305,13 @@ export const getAccessTokenFromPage = async (
   try {
 
     if (!token) throw new Error("ERR_FETCHING_FB_USER_TOKEN");
+    if (!process.env.FACEBOOK_APP_ID || !process.env.FACEBOOK_APP_SECRET) {
+      logger.warn("FACEBOOK_APP_ID/FACEBOOK_APP_SECRET missing; using page token without exchange");
+      return token;
+    }
 
     const data = await axios.get(
-      "https://graph.facebook.com/v18.0/oauth/access_token",
+      `${graphApiBaseUrl}oauth/access_token`,
       {
         params: {
           client_id: process.env.FACEBOOK_APP_ID,
@@ -266,12 +329,38 @@ export const getAccessTokenFromPage = async (
   }
 };
 
+/**
+ * Trocar o user access token de curta duração por um de longa duração (~60 dias).
+ * Depois desse passo, /me/accounts retorna page tokens que NÃO expiram (até o usuário revogar).
+ */
+export const exchangeForLongLivedUserToken = async (
+  shortLivedUserToken: string
+): Promise<string> => {
+  if (!process.env.FACEBOOK_APP_ID || !process.env.FACEBOOK_APP_SECRET) {
+    logger.warn(
+      "FACEBOOK_APP_ID/FACEBOOK_APP_SECRET ausentes — sem extensão de token, conexão vai expirar em ~1h"
+    );
+    return shortLivedUserToken;
+  }
+
+  const { data } = await axios.get(`${graphApiBaseUrl}oauth/access_token`, {
+    params: {
+      client_id: process.env.FACEBOOK_APP_ID,
+      client_secret: process.env.FACEBOOK_APP_SECRET,
+      grant_type: "fb_exchange_token",
+      fb_exchange_token: shortLivedUserToken
+    }
+  });
+
+  return data.access_token;
+};
+
 export const removeApplcation = async (
   id: string,
   token: string
 ): Promise<void> => {
   try {
-    await axios.delete(`https://graph.facebook.com/v18.0/${id}/permissions`, {
+    await axios.delete(`${graphApiBaseUrl}${id}/permissions`, {
       params: {
         access_token: token
       }

@@ -7,6 +7,7 @@ module.exports = [{
   autorestart: true,     // Reinicia automaticamente em caso de falhas
   watch: false,
   merge_logs: true,
+  time: true,
   log_date_format: 'YYYY-MM-DD HH:mm:ss',
   env: {
     NODE_ENV: 'production'

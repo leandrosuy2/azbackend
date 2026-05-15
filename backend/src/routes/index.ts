@@ -47,6 +47,7 @@ import flowBuilder from "./flowBuilderRoutes";
 import flowCampaignRoutes from "./flowCampaignRoutes";
 import quadroRoutes from "./quadroRoutes";
 import ticketBudgetRoutes from "./ticketBudgetRoutes";
+import metaRoutes from "./metaRoutes";
 
 
 const routes = Router();
@@ -101,5 +102,6 @@ routes.use(companySettingsRoutes);
 routes.use(scheduleMessageRoutes);
 routes.use(quadroRoutes);
 routes.use(ticketBudgetRoutes);
+routes.use(metaRoutes);
 
 export default routes;

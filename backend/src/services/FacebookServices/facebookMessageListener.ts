@@ -9,6 +9,11 @@ import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateConta
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import { getProfile, profilePsid, sendText } from "./graphAPI";
+import {
+  getInstagramProfile,
+  isInstagramDirectProvider,
+  sendInstagramText
+} from "../InstagramServices/instagramAPI";
 import Whatsapp from "../../models/Whatsapp";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import { debounce } from "../../helpers/Debounce";
@@ -87,13 +92,53 @@ export interface ReplyTo {
   mid: string;
 }
 
+const getMetaProfile = async (
+  id: string,
+  token: Whatsapp
+): Promise<any> => {
+  if (
+    token.channel === "instagram" &&
+    isInstagramDirectProvider(token.provider, token.facebookUserToken)
+  ) {
+    return getInstagramProfile(id, token.facebookUserToken);
+  }
+
+  return profilePsid(id, token.facebookUserToken);
+};
+
+const sendMetaText = async (
+  session: Whatsapp,
+  recipientId: string,
+  body: string
+): Promise<any> => {
+  if (
+    session.channel === "instagram" &&
+    isInstagramDirectProvider(session.provider, session.facebookUserToken)
+  ) {
+    return sendInstagramText(
+      session.facebookPageUserId,
+      recipientId,
+      body,
+      session.facebookUserToken
+    );
+  }
+
+  return sendText(recipientId, body, session.facebookUserToken);
+};
+
 const verifyContact = async (msgContact: any, token: any, companyId: any) => {
   if (!msgContact) return null;
 
+  const contactName =
+    msgContact?.name ||
+    msgContact?.username ||
+    [msgContact?.first_name, msgContact?.last_name].filter(Boolean).join(" ") ||
+    msgContact.id;
+
   const contactData = {
-    name: msgContact?.name || `${msgContact?.first_name} ${msgContact?.last_name}`,
+    name: contactName,
     number: msgContact.id,
-    profilePicUrl: msgContact.profile_pic,
+    profilePicUrl: msgContact.profile_pic || msgContact.profile_picture_url,
     isGroup: false,
     companyId: companyId,
     channel: token.channel,
@@ -503,9 +548,9 @@ export const handleMessage = async (
       if (fromMe) {
         if (/\u200e/.test(bodyMessage)) return;
 
-        msgContact = await profilePsid(recipientPsid, token.facebookUserToken);
+        msgContact = await getMetaProfile(recipientPsid, token);
       } else {
-        msgContact = await profilePsid(senderPsid, token.facebookUserToken);
+        msgContact = await getMetaProfile(senderPsid, token);
       }
 
       const contact = await verifyContact(msgContact, token, companyId);
@@ -643,11 +688,7 @@ export const handleMessage = async (
 
               if (ticket.amountUsedBotQueuesNPS < getSession.maxUseBotQueuesNPS) {
                 let bodyErrorRating = `\u200eOpção inválida, tente novamente.\n`;
-                const sentMessage = await sendText(
-                  contact.number,
-                  bodyErrorRating,
-                  getSession.facebookUserToken
-                );
+                const sentMessage = await sendMetaText(getSession, contact.number, bodyErrorRating);
 
                 await verifyMessageFace(sentMessage, bodyErrorRating, ticket, contact);
 
@@ -656,7 +697,7 @@ export const handleMessage = async (
 
                 let bodyRatingMessage = `\u200e${getSession.ratingMessage}\n`;
 
-                const msg = await sendText(contact.number, bodyRatingMessage, getSession.facebookUserToken);
+                const msg = await sendMetaText(getSession, contact.number, bodyRatingMessage);
 
                 await verifyMessageFace(sentMessage, bodyRatingMessage, ticket, contact);
 
@@ -696,10 +737,10 @@ export const handleMessage = async (
 
                   if (getSession.complationMessage !== "" && getSession.complationMessage !== undefined) {
 
-                    const sentMessage = await sendText(
+                    const sentMessage = await sendMetaText(
+                      getSession,
                       contact.number,
-                      `\u200e${getSession.complationMessage}`,
-                      getSession.facebookUserToken
+                      `\u200e${getSession.complationMessage}`
                     );
 
                     await verifyMessageFace(sentMessage, `\u200e${getSession.complationMessage}`, ticket, contact);
@@ -750,11 +791,7 @@ export const handleMessage = async (
               if (!isNil(settings?.lgpdMessage) && settings.lgpdMessage !== "") {
                 const bodyMessageLGPD = formatBody(`\u200e${settings.lgpdMessage}`, ticket);
 
-                const sentMessage = await sendText(
-                  contact.number,
-                  bodyMessageLGPD,
-                  getSession.facebookUserToken
-                );
+                const sentMessage = await sendMetaText(getSession, contact.number, bodyMessageLGPD);
 
                 await verifyMessageFace(sentMessage, bodyMessageLGPD, ticket, contact);
 
@@ -763,11 +800,7 @@ export const handleMessage = async (
 
               if (!isNil(settings?.lgpdLink) && settings?.lgpdLink !== "") {
                 const bodyLink = formatBody(`\u200e${settings.lgpdLink}`, ticket);
-                const sentMessage = await sendText(
-                  contact.number,
-                  bodyLink,
-                  getSession.facebookUserToken
-                );
+                const sentMessage = await sendMetaText(getSession, contact.number, bodyLink);
 
                 await verifyMessageFace(sentMessage, bodyLink, ticket, contact);
               };
@@ -779,11 +812,7 @@ export const handleMessage = async (
                 ticket
               );
 
-              const sentMessageBot = await sendText(
-                contact.number,
-                bodyBot,
-                getSession.facebookUserToken
-              );
+              const sentMessageBot = await sendMetaText(getSession, contact.number, bodyBot);
 
               await verifyMessageFace(sentMessageBot, bodyBot, ticket, contact);
 

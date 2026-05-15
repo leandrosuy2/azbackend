@@ -34,6 +34,7 @@ import { addSeconds, differenceInSeconds } from "date-fns";
 import { GetWhatsapp } from "./helpers/GetWhatsapp";
 import ProcessKanbanPrazoLembretesJob from "./services/TicketLembreteServices/ProcessKanbanPrazoLembretesJob";
 import ProcessKanbanAgendadoLembretesJob from "./services/TicketLembreteServices/ProcessKanbanAgendadoLembretesJob";
+import CheckMetaConnectionsService from "./services/FacebookServices/CheckMetaConnectionsService";
 const CronJob = require('cron').CronJob;
 import CompaniesSettings from "./models/CompaniesSettings";
 import { verifyMediaMessage, verifyMessage } from "./services/WbotServices/wbotMessageListener";
@@ -1715,6 +1716,24 @@ function handleKanbanAgendadoLembretes() {
   );
 }
 handleKanbanAgendadoLembretes();
+
+function handleCheckMetaConnections() {
+  const job = new CronJob(
+    "0 0 */6 * * *",
+    async () => {
+      try {
+        await CheckMetaConnectionsService();
+      } catch (e) {
+        logger.error("handleCheckMetaConnections", e);
+      }
+    },
+    null,
+    true,
+    "America/Sao_Paulo"
+  );
+  job.start();
+}
+handleCheckMetaConnections();
 
 handleWhatsapp();
 handleProcessLanes();
