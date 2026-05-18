@@ -382,7 +382,21 @@ export const storeInstagramDirect = async (
       });
     }
 
-    const shortLivedTokenData = await exchangeInstagramCodeForToken(code, redirectUri);
+    let shortLivedTokenData: any;
+    try {
+      shortLivedTokenData = await exchangeInstagramCodeForToken(code, redirectUri);
+    } catch (error) {
+      console.error("[storeInstagramDirect] code exchange failed", {
+        redirectUri,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
+      return res.status(502).json({
+        error:
+          "Falha ao trocar o código de autorização do Instagram. Verifique se a URL de redirecionamento cadastrada no app da Meta é exatamente a mesma usada pelo sistema."
+      });
+    }
+
     const shortLivedToken = shortLivedTokenData.access_token;
     let instagramAccessToken = shortLivedToken;
     let tokenMetaExpiresAt: Date | null = null;
@@ -395,21 +409,32 @@ export const storeInstagramDirect = async (
         tokenMetaExpiresAt = new Date(Date.now() + longLived.expiresInSeconds * 1000);
       }
     } catch (error) {
-      console.warn("[storeInstagramDirect] long-lived token exchange failed; using short-lived token", {
-        error: error?.response?.data?.error || error?.message
+      // Sem o long-lived a conexão expira em ~1h e o subscribe abaixo
+      // tende a falhar. Logamos o erro completo da Meta para diagnóstico.
+      console.error("[storeInstagramDirect] long-lived token exchange failed", {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message
       });
     }
 
     try {
       instagramProfile = await getInstagramMe(instagramAccessToken);
     } catch (error) {
-      console.warn("[storeInstagramDirect] profile fetch failed; using token response user_id", {
+      // Não é fatal: o code exchange já devolve user_id Instagram-scoped,
+      // que é o que precisamos para casar com o webhook. Seguimos sem o
+      // perfil completo (nome/username) quando o /me falha.
+      console.warn("[storeInstagramDirect] profile fetch failed; using code exchange user_id", {
         error: error?.response?.data?.error || error?.message
       });
     }
 
-    const instagramUserId =
-      String(instagramProfile.user_id || instagramProfile.id || shortLivedTokenData.user_id || "");
+    // O webhook do Instagram envia entry.id = user_id (Instagram-scoped).
+    // O campo "id" do /me é app-scoped e NÃO bate com o webhook — por isso
+    // priorizamos sempre user_id e nunca caímos para o id app-scoped.
+    const instagramUserId = String(
+      instagramProfile.user_id || shortLivedTokenData.user_id || ""
+    );
 
     if (!instagramUserId) {
       return res.status(400).json({
@@ -420,9 +445,13 @@ export const storeInstagramDirect = async (
     try {
       await subscribeInstagramDirectApp(instagramUserId, instagramAccessToken);
     } catch (error) {
-      console.warn("[storeInstagramDirect] webhook subscription failed", {
+      console.error("[storeInstagramDirect] webhook subscription failed", {
         instagramUserId,
         error: error?.response?.data?.error || error?.message
+      });
+      return res.status(502).json({
+        error:
+          "A conta foi autorizada, mas não foi possível inscrever o webhook de mensagens na Meta. A conta não receberia mensagens. Tente novamente."
       });
     }
 

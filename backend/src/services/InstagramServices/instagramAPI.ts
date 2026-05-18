@@ -1,15 +1,11 @@
 import axios from "axios";
 import logger from "../../utils/logger";
 
-const normalizeVersion = (version?: string): string => {
-  const rawVersion = version || "v25.0";
-  return rawVersion.startsWith("v") ? rawVersion : `v${rawVersion}`;
-};
-
-const instagramApiVersion = normalizeVersion(
-  process.env.INSTAGRAM_GRAPH_API_VERSION || process.env.META_GRAPH_API_VERSION
-);
-const instagramGraphBaseUrl = `https://graph.instagram.com/${instagramApiVersion}/`;
+// A API do Instagram com Login do Instagram (graph.instagram.com) NÃO usa
+// prefixo de versão no path. Chamar /v25.0/me, /{id}/subscribed_apps etc.
+// retorna "Unsupported request - method type: get" (IGApiException code 100).
+// Os endpoints são versionados implicitamente pelo host.
+const instagramGraphBaseUrl = "https://graph.instagram.com/";
 
 export interface InstagramRefreshResult {
   accessToken: string;
@@ -73,18 +69,34 @@ export const exchangeForLongLivedInstagramToken = async (
   shortLivedToken: string
 ): Promise<InstagramRefreshResult> => {
   const { appSecret } = getInstagramAppCredentials();
-  const { data } = await axios.get("https://graph.instagram.com/access_token", {
-    params: {
-      grant_type: "ig_exchange_token",
-      client_secret: appSecret,
-      access_token: shortLivedToken
-    }
-  });
 
-  return {
-    accessToken: data.access_token,
-    expiresInSeconds: Number(data.expires_in) || 0
-  };
+  try {
+    const { data } = await axios.get(
+      "https://graph.instagram.com/access_token",
+      {
+        params: {
+          grant_type: "ig_exchange_token",
+          client_secret: appSecret,
+          access_token: shortLivedToken
+        }
+      }
+    );
+
+    return {
+      accessToken: data.access_token,
+      expiresInSeconds: Number(data.expires_in) || 0
+    };
+  } catch (error) {
+    // ig_exchange_token só funciona uma vez, com token short-lived.
+    // Ao reconectar uma conta com sessão ativa, o code OAuth já devolve
+    // um token long-lived e o exchange falha (code 100 "Unsupported
+    // request" ou 452 "Session key invalid"). Nesse caso o token já É
+    // long-lived: usamos ig_refresh_token para obter a validade real.
+    logger.info(
+      "[Instagram Direct] ig_exchange_token falhou; token provavelmente já é long-lived, tentando refresh"
+    );
+    return refreshInstagramLongLivedToken(shortLivedToken);
+  }
 };
 
 /**
@@ -133,7 +145,11 @@ export const subscribeInstagramDirectApp = async (
   igUserId: string,
   token: string
 ): Promise<any> => {
-  const { data } = await apiBase(token).post(`${igUserId}/subscribed_apps`, null, {
+  // Para Instagram Login a inscrição correta é em `me/subscribed_apps`
+  // (a Meta resolve a conta pela sessão do token). Usar o ID na URL
+  // — sobretudo o app-scoped — retorna IGApiException code 100
+  // "Unsupported request - method type: post".
+  const { data } = await apiBase(token).post("me/subscribed_apps", null, {
     params: {
       subscribed_fields: "messages,messaging_postbacks"
     }
