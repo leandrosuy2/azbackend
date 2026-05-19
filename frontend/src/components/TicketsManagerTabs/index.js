@@ -33,6 +33,7 @@ import {
 } from "@material-ui/icons";
 
 import api from "../../services/api";
+import HelpHint from "../HelpHint";
 import NewTicketModal from "../NewTicketModal";
 
 import TicketsList from "../TicketsListCustom";
@@ -509,6 +510,7 @@ const TicketsManagerTabs = () => {
               <NewMessageIcon style={{ fontSize: 26 }} />
             </IconButton>
           </Tooltip>
+          <HelpHint areaKey="tickets" />
         </Box>
       </div>
 

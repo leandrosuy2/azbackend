@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import usePlans from "../../hooks/usePlans";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import HelpHint from "../../components/HelpHint";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -321,9 +322,12 @@ const MessagesAPI = () => {
       // className={classes.elementMargin}
       variant="outlined"
     >
-      <Typography variant="h5">
-        {i18n.t("messagesAPI.API.title")}
-      </Typography>
+      <span style={{ display: "flex", alignItems: "center" }}>
+        <Typography variant="h5">
+          {i18n.t("messagesAPI.API.title")}
+        </Typography>
+        <HelpHint areaKey="messages-api" />
+      </span>
       <Typography variant="h6" color="primary" className={classes.elementMargin}>
       {i18n.t("messagesAPI.API.methods.title")}
       </Typography>

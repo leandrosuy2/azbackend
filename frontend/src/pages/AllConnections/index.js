@@ -42,6 +42,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import useCompanies from "../../hooks/useCompanies";
@@ -437,9 +438,12 @@ const AllConnections = () => {
           <Paper className={classes.mainPaper} style={{ overflow: "hidden" }} variant="outlined">
             <MainHeader>
               <Stack>
-                <Typography variant="h5" color="black" style={{ fontWeight: "bold", marginLeft: "10px", marginTop: "10px" }} gutterBottom>
-                  {i18n.t("connections.title")}
-                </Typography>
+                <span style={{ display: "flex", alignItems: "center" }}>
+                  <Typography variant="h5" color="black" style={{ fontWeight: "bold", marginLeft: "10px", marginTop: "10px" }} gutterBottom>
+                    {i18n.t("connections.title")}
+                  </Typography>
+                  <HelpHint areaKey="connections" />
+                </span>
                 <Typography style={{ marginTop: "-10px", marginLeft: "10px" }} variant="caption" color="textSecondary">
                   Conecte seus canais de atendimento para receber mensagens e iniciar conversas com seus clientes.
                 </Typography>

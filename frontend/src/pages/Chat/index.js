@@ -26,6 +26,7 @@ import { has, isObject } from "lodash";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import withWidth, { isWidthUp } from "@material-ui/core/withWidth";
 import { i18n } from "../../translate/i18n";
+import HelpHint from "../../components/HelpHint";
 
 const useStyles = makeStyles((theme) => ({
   mainContainer: {
@@ -52,7 +53,10 @@ const useStyles = makeStyles((theme) => ({
     width: "100%",
   },
   btnContainer: {
-    textAlign: "right",
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: theme.spacing(1),
     padding: 10,
   },
 }));
@@ -349,6 +353,7 @@ function Chat(props) {
             >
               {i18n.t("chatInternal.new")}
             </Button>
+            <HelpHint areaKey="chats" />
           </div>
           {/* )} */}
           <ChatList
@@ -405,6 +410,7 @@ function Chat(props) {
               >
                 Novo
               </Button>
+              <HelpHint areaKey="chats" />
             </div>
             <ChatList
               chats={chats}

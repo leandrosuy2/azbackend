@@ -20,6 +20,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import whatsappIcon from '../../assets/nopicture.png'
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
@@ -258,7 +259,10 @@ const Users = () => {
         :
         <>
           <MainHeader>
-            <Title>{i18n.t("users.title")} ({users.length})</Title>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Title>{i18n.t("users.title")} ({users.length})</Title>
+              <HelpHint areaKey="users" />
+            </span>
             <MainHeaderButtonsWrapper>
               <TextField
                 placeholder={i18n.t("contacts.searchPlaceholder")}

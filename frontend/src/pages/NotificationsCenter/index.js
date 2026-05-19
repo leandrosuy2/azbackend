@@ -19,6 +19,7 @@ import RemoveDoneIcon from "@material-ui/icons/RemoveCircleOutline";
 import InboxIcon from "@material-ui/icons/Inbox";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+import HelpHint from "../../components/HelpHint";
 
 const STORAGE_KEY = "azchat_notifications_center";
 const READ_STORAGE_KEY = "azchat_notifications_read_ids";
@@ -771,7 +772,10 @@ const NotificationsCenter = () => {
   return (
     <Box className={classes.root}>
       <Box className={classes.topbar}>
-        <Typography className={classes.topbarTitle}>Notificações</Typography>
+        <Box display="flex" alignItems="center">
+          <Typography className={classes.topbarTitle}>Notificações</Typography>
+          <HelpHint areaKey="notifications" />
+        </Box>
         <span
           className={[
             classes.topbarCounter,

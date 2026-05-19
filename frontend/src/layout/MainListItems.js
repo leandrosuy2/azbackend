@@ -1,7 +1,6 @@
 import React, { useContext, useEffect, useReducer, useState } from "react";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import { makeStyles, useTheme } from "@material-ui/core/styles";
-import useHelps from "../hooks/useHelps";
 import ListItem from "@material-ui/core/ListItem";
 import ListItemIcon from "@material-ui/core/ListItemIcon";
 import ListItemText from "@material-ui/core/ListItemText";
@@ -22,7 +21,6 @@ import PeopleAltOutlinedIcon from "@material-ui/icons/PeopleAltOutlined";
 import ContactPhoneOutlinedIcon from "@material-ui/icons/ContactPhoneOutlined";
 import AccountTreeOutlinedIcon from "@material-ui/icons/AccountTreeOutlined";
 import FlashOnIcon from "@material-ui/icons/FlashOn";
-import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import MenuBookIcon from "@material-ui/icons/MenuBook";
 import CodeRoundedIcon from "@material-ui/icons/CodeRounded";
 import ViewKanban from "@mui/icons-material/ViewKanban";
@@ -45,7 +43,6 @@ import {
   Description,
   DeviceHubOutlined,
   GridOn,
-  ListAlt,
   PhonelinkSetup,
 } from "@material-ui/icons";
 
@@ -59,9 +56,8 @@ import { isArray } from "lodash";
 import api from "../services/api";
 import toastError from "../errors/toastError";
 import usePlans from "../hooks/usePlans";
-import useVersion from "../hooks/useVersion";
 import { i18n } from "../translate/i18n";
-import { Campaign, ShapeLine, Webhook } from "@mui/icons-material";
+import { ShapeLine, Webhook } from "@mui/icons-material";
 import { isSocketClientReady } from "../utils/socketClient";
 
 const NOTIFICATIONS_CENTER_STORAGE_KEY = "azchat_notifications_center";
@@ -238,7 +234,6 @@ const MainListItems = ({ collapsed, drawerClose }) => {
   const [connectionWarning, setConnectionWarning] = useState(false);
   const [openCampaignSubmenu, setOpenCampaignSubmenu] = useState(false);
   const [openFlowSubmenu, setOpenFlowSubmenu] = useState(false);
-  const [openTutoriaisSubmenu, setOpenTutoriaisSubmenu] = useState(false);
   const [openDashboardSubmenu, setOpenDashboardSubmenu] = useState(false);
   const [showCampaigns, setShowCampaigns] = useState(false);
   const [showKanban, setShowKanban] = useState(false);
@@ -254,24 +249,10 @@ const MainListItems = ({ collapsed, drawerClose }) => {
   const [pageNumber, setPageNumber] = useState(1);
   const [searchParam] = useState("");
   const [chats, dispatch] = useReducer(reducer, []);
-  const [version, setVersion] = useState(false);
   const [managementHover, setManagementHover] = useState(false);
   const [campaignHover, setCampaignHover] = useState(false);
   const [flowHover, setFlowHover] = useState(false);
-  const [tutoriaisHover, setTutoriaisHover] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-  const { list } = useHelps();  // INSERIR
-  const [hasHelps, setHasHelps] = useState(false);
-
-
-  useEffect(() => {   // INSERIR ESSE EFFECT INTEIRO
-    async function checkHelps() {
-      const helps = await list();
-      setHasHelps(helps.length > 0);
-    }
-    checkHelps();
-  }, []);
-
   const isManagementActive =
     location.pathname === "/" || location.pathname.startsWith("/reports") || location.pathname.startsWith("/moments");
 
@@ -283,8 +264,6 @@ const MainListItems = ({ collapsed, drawerClose }) => {
   const isFlowbuilderRouteActive =
     location.pathname.startsWith("/phrase-lists") ||
     location.pathname.startsWith("/flowbuilders");
-
-  const isTutoriaisRouteActive = location.pathname.startsWith("/tutoriais");
 
   useEffect(() => {
     if (location.pathname.startsWith("/tickets")) {
@@ -334,17 +313,6 @@ const MainListItems = ({ collapsed, drawerClose }) => {
   }, []);
 
   const { getPlanCompany } = usePlans();
-
-  const { getVersion } = useVersion();
-
-  useEffect(() => {
-    async function fetchVersion() {
-      const _version = await getVersion();
-      setVersion(_version.version);
-    }
-    fetchVersion();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     dispatch({ type: "RESET" });
@@ -422,11 +390,6 @@ const MainListItems = ({ collapsed, drawerClose }) => {
   //   }
   // }, []);
 
-  useEffect(() => {
-    if (location.pathname.startsWith("/tutoriais")) {
-      setOpenTutoriaisSubmenu(true);
-    }
-  }, [location.pathname]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -623,65 +586,12 @@ const MainListItems = ({ collapsed, drawerClose }) => {
         icon={<EventAvailableIcon />}
       /> */}
       
-        <ListItemLink
-          to="/helps"
-          primary={i18n.t("mainDrawer.listItems.helps")}
-          icon={<HelpOutlineIcon />}
-          tooltip={collapsed}
-        />
-
-      <Tooltip title={collapsed ? "Tutoriais" : ""} placement="right">
-        <ListItem
-          dense
-          button
-          onClick={() => setOpenTutoriaisSubmenu((prev) => !prev)}
-          onMouseEnter={() => setTutoriaisHover(true)}
-          onMouseLeave={() => setTutoriaisHover(false)}
-        >
-          <ListItemIcon>
-            <Avatar
-              className={`${classes.iconHoverActive} ${isTutoriaisRouteActive || tutoriaisHover ? "active" : ""}`}
-            >
-              <MenuBookIcon />
-            </Avatar>
-          </ListItemIcon>
-          <ListItemText
-            primary={
-              <Typography className={classes.listItemText}>Tutoriais</Typography>
-            }
-          />
-          {openTutoriaisSubmenu ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        </ListItem>
-      </Tooltip>
-      <Collapse
-        in={openTutoriaisSubmenu}
-        timeout="auto"
-        unmountOnExit
-        style={{
-          backgroundColor: theme.mode === "light" ? "rgba(120,120,120,0.1)" : "rgba(120,120,120,0.5)",
-        }}
-      >
-        <List dense component="div" disablePadding>
-          <ListItemLink
-            to="/tutoriais"
-            primary="Todos os tutoriais"
-            icon={<MenuBookIcon />}
-            tooltip={collapsed}
-          />
-          <ListItemLink
-            to="/tutoriais/flowbuilder"
-            primary="FlowBuilder — Passo a passo"
-            icon={<Webhook />}
-            tooltip={collapsed}
-          />
-          <ListItemLink
-            to="/tutoriais/filas"
-            primary="Filas — Todos os campos"
-            icon={<AccountTreeOutlinedIcon />}
-            tooltip={collapsed}
-          />
-        </List>
-      </Collapse>
+      <ListItemLink
+        to="/tutoriais"
+        primary="Tutoriais"
+        icon={<MenuBookIcon />}
+        tooltip={collapsed}
+      />
 
       <Can
         role={user.profile === "user" && user.allowConnections === "enabled" ? "admin" : user.profile}

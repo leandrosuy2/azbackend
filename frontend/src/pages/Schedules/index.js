@@ -31,6 +31,7 @@ import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import ScheduleModal from "../../components/ScheduleModal";
+import HelpHint from "../../components/HelpHint";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import toastError from "../../errors/toastError";
 import moment from "moment";
@@ -390,9 +391,12 @@ const Schedules = () => {
       )}
       <MainHeader>
         <Box>
-          <Title>
-            {i18n.t("schedules.title")} ({schedules.length})
-          </Title>
+          <span style={{ display: "flex", alignItems: "center" }}>
+            <Title>
+              {i18n.t("schedules.title")} ({schedules.length})
+            </Title>
+            <HelpHint areaKey="schedules" />
+          </span>
           <Typography variant="body2" color="textSecondary" style={{ marginTop: 4 }}>
             {i18n.t("schedules.subtitle")}
           </Typography>

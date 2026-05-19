@@ -26,6 +26,7 @@ import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import MainContainer from "../../components/MainContainer";
+import HelpHint from "../../components/HelpHint";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../../components/Can";
@@ -316,7 +317,10 @@ const FlowBuilder = () => {
           : `${i18n.t("contacts.confirmationModal.importMessage")}`}
       </ConfirmationModal>
       <MainHeader>
-        <Title>Fluxos de conversa</Title>
+        <span style={{ display: "flex", alignItems: "center" }}>
+          <Title>Fluxos de conversa</Title>
+          <HelpHint areaKey="flowbuilder" />
+        </span>
         <MainHeaderButtonsWrapper>
           <TextField
             placeholder={i18n.t("contacts.searchPlaceholder")}

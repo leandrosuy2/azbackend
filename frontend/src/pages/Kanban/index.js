@@ -55,6 +55,7 @@ import ChevronRight from "@material-ui/icons/ChevronRight";
 import Description from "@material-ui/icons/Description";
 import resolveContactWhatsAppPhone from "../../utils/resolveContactWhatsAppPhone";
 import { openWhatsAppWebFromContact } from "../../utils/kanbanWhatsApp";
+import HelpHint from "../../components/HelpHint";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -78,6 +79,9 @@ const useStyles = makeStyles((theme) => ({
     minHeight: "70vh",
   },
   landingTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(1),
     fontWeight: 700,
     fontSize: "1.6rem",
     marginBottom: 4,
@@ -232,6 +236,9 @@ const useStyles = makeStyles((theme) => ({
     fontSize: "0.85rem",
   },
   boardCurrentName: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(1),
     fontWeight: 700,
     fontSize: "1rem",
     flex: 1,
@@ -2455,8 +2462,9 @@ const Kanban = () => {
     return (
       <div className={classes.root}>
         <div className={classes.landingPage}>
-          <Typography className={classes.landingTitle}>
+          <Typography component="div" className={classes.landingTitle}>
             Áreas de Trabalho
+            <HelpHint areaKey="kanban" />
           </Typography>
           <Typography className={classes.landingSubtitle}>
             Selecione uma área para acessar o quadro
@@ -2612,8 +2620,11 @@ const Kanban = () => {
           Áreas
         </Button>
         <Divider orientation="vertical" flexItem />
-        <Typography className={classes.boardCurrentName}>
-          {quadroGroups.find((g) => String(g.id) === String(selectedQuadroGroupId))?.name || "Quadro"}
+        <Typography component="div" className={classes.boardCurrentName}>
+          <span>
+            {quadroGroups.find((g) => String(g.id) === String(selectedQuadroGroupId))?.name || "Quadro"}
+          </span>
+          <HelpHint areaKey="kanban" />
         </Typography>
         {quadroGroups.map((g) => {
           const isActive = String(g.id) === String(selectedQuadroGroupId);

@@ -33,14 +33,18 @@ const SetTicketMessagesAsRead = async (ticket: Ticket): Promise<void> => {
         });
 
         if (getJsonMessage.length > 0) {
-
-          getJsonMessage.forEach(async message => {
+          for (const message of getJsonMessage) {
             const msg: proto.IWebMessageInfo = JSON.parse(message.dataJson);
             if (msg.key && msg.key.fromMe === false && !ticket.isBot && (ticket.userId || ticket.isGroup)) {
-
-              await wbot.readMessages([msg.key])
+              try {
+                await wbot.readMessages([msg.key]);
+              } catch (err) {
+                logger.warn(
+                  `Could not send read receipt. Maybe whatsapp session disconnected? Err: ${err}`
+                );
+              }
             }
-          });
+          }
         }
 
         await Message.update(

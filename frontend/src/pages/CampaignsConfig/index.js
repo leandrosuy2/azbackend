@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import api from "../../services/api";
 import usePlans from "../../hooks/usePlans";
@@ -202,7 +203,10 @@ const CampaignsConfig = () => {
             <MainHeader>
               <Grid style={{ width: "99.6%" }} container>
                 <Grid xs={12} item>
-                  <Title>{i18n.t("campaignsConfig.title")}</Title>
+                  <span style={{ display: "flex", alignItems: "center" }}>
+                    <Title>{i18n.t("campaignsConfig.title")}</Title>
+                    <HelpHint areaKey="campaigns-config" />
+                  </span>
                 </Grid>
               </Grid>
             </MainHeader>

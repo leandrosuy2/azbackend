@@ -35,6 +35,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import IntegrationModal from "../../components/QueueIntegrationModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -251,7 +252,10 @@ const QueueIntegration = () => {
         :
         <>
           <MainHeader>
-            <Title>{i18n.t("queueIntegration.title")} ({queueIntegration.length})</Title>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Title>{i18n.t("queueIntegration.title")} ({queueIntegration.length})</Title>
+              <HelpHint areaKey="queue-integration" />
+            </span>
             <MainHeaderButtonsWrapper>
               <TextField
                 placeholder={i18n.t("queueIntegration.searchPlaceholder")}

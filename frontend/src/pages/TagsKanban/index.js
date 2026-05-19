@@ -27,6 +27,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
@@ -258,7 +259,10 @@ const Tags = () => {
         />
       )}
       <MainHeader>
-        <Title>{i18n.t("tagsKanban.title")} ({tags.length})</Title>
+        <span style={{ display: "flex", alignItems: "center" }}>
+          <Title>{i18n.t("tagsKanban.title")} ({tags.length})</Title>
+          <HelpHint areaKey="kanban" />
+        </span>
         <MainHeaderButtonsWrapper>
           <FormControl variant="outlined" size="small" style={{ minWidth: 220, marginRight: 8 }}>
             <InputLabel id="tags-kanban-area-label">

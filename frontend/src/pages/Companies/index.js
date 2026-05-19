@@ -37,6 +37,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import CompanyModal from "../../components/CompaniesModal";
 
@@ -397,9 +398,12 @@ const Companies = () => {
 
       <MainHeader>
         <Box className={classes.headerWrap} flex={1} minWidth={0}>
-          <Title>
-            {i18n.t("compaies.title")} ({companies.length})
-          </Title>
+          <span style={{ display: "flex", alignItems: "center" }}>
+            <Title>
+              {i18n.t("compaies.title")} ({companies.length})
+            </Title>
+            <HelpHint areaKey="companies" />
+          </span>
           <Typography variant="body2" className={classes.subtitle}>
             {i18n.t("compaies.subtitle")}
           </Typography>

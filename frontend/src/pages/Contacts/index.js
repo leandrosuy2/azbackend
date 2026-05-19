@@ -46,6 +46,7 @@ import Title from "../../components/Title";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import MainContainer from "../../components/MainContainer";
 import toastError from "../../errors/toastError";
+import HelpHint from "../../components/HelpHint";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../../components/Can";
@@ -779,9 +780,12 @@ const Contacts = () => {
                 {bulkConfirmBody}
             </ConfirmationModal>
             <MainHeader>
-                <Title>
-                    {i18n.t("contacts.title")} ({totalCount})
-                </Title>
+                <span style={{ display: "flex", alignItems: "center" }}>
+                    <Title>
+                        {i18n.t("contacts.title")} ({totalCount})
+                    </Title>
+                    <HelpHint areaKey="contacts" />
+                </span>
                 <MainHeaderButtonsWrapper>
                     <Box
                         className={classes.filtersBar}

@@ -4,6 +4,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import { i18n } from "../../translate/i18n";
 import useHelps from "../../hooks/useHelps";
 
@@ -158,7 +159,10 @@ const Helps = () => {
   return (
     <MainContainer>
       <MainHeader>
-        <Title>{i18n.t("helps.title")} ({records.length})</Title>
+        <span style={{ display: "flex", alignItems: "center" }}>
+          <Title>{i18n.t("helps.title")} ({records.length})</Title>
+          <HelpHint areaKey="helps" />
+        </span>
         <MainHeaderButtonsWrapper></MainHeaderButtonsWrapper>
       </MainHeader>
       <div className={classes.mainPaper}>

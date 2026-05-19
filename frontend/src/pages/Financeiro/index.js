@@ -37,6 +37,7 @@ import InfoIcon from "@material-ui/icons/Info";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import SubscriptionModal from "../../components/SubscriptionModal";
 import api from "../../services/api";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
@@ -505,6 +506,7 @@ const Invoices = () => {
         <Box className={classes.title}>
           <ReceiptIcon fontSize="large" />
           <Title>Faturas</Title>
+          <HelpHint areaKey="budgets" />
           <span className={classes.invoiceCount}>{invoices.length}</span>
         </Box>
       </MainHeader>

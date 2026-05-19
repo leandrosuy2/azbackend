@@ -27,6 +27,7 @@ import PauseCircleOutlineIcon from "@material-ui/icons/PauseCircleOutline";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
@@ -294,7 +295,10 @@ const Campaigns = () => {
             <MainHeader>
               <Grid style={{ width: "99.6%" }} container>
                 <Grid xs={12} sm={8} item>
-                  <Title>{i18n.t("campaigns.title")}</Title>
+                  <span style={{ display: "flex", alignItems: "center" }}>
+                    <Title>{i18n.t("campaigns.title")}</Title>
+                    <HelpHint areaKey="campaigns" />
+                  </span>
                 </Grid>
                 <Grid xs={12} sm={4} item>
                   <Grid spacing={2} container>

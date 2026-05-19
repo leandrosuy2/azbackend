@@ -43,6 +43,7 @@ import Filters from "./Filters";
 import { ChartsDate } from "./ChartsDate";
 import ForbiddenPage from "../../components/ForbiddenPage";
 import { i18n } from "../../translate/i18n";
+import HelpHint from "../../components/HelpHint";
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -190,9 +191,12 @@ const Dashboard = () => {
       <Container maxWidth="xl">
         {/* Header with filter button */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-          <Typography variant="h4" fontWeight="bold" color="primary">
-            {i18n.t("dashboard.title") || "Dashboard"}
-          </Typography>          
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Typography variant="h4" fontWeight="bold" color="primary">
+              {i18n.t("dashboard.title") || "Dashboard"}
+            </Typography>
+            <HelpHint areaKey="dashboard" />
+          </Box>
           
         </Box>
 

@@ -27,6 +27,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
@@ -222,7 +223,10 @@ const FileLists = () => {
                 :
                 <>
                     <MainHeader>
-                        <Title>{i18n.t("files.title")} ({files.length})</Title>
+                        <span style={{ display: "flex", alignItems: "center" }}>
+                            <Title>{i18n.t("files.title")} ({files.length})</Title>
+                            <HelpHint areaKey="files" />
+                        </span>
                         <MainHeaderButtonsWrapper>
                             <TextField
                                 placeholder={i18n.t("contacts.searchPlaceholder")}

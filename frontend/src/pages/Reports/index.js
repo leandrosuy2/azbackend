@@ -23,6 +23,7 @@ import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import MainContainer from "../../components/MainContainer";
+import HelpHint from "../../components/HelpHint";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../../components/Can";
@@ -364,7 +365,10 @@ const Reports = () => {
           ticketId={ticketOpen.id}
         />
       )}
-      <Title>{i18n.t("reports.title")}</Title>
+      <span style={{ display: "flex", alignItems: "center" }}>
+        <Title>{i18n.t("reports.title")}</Title>
+        <HelpHint areaKey="dashboard" />
+      </span>
 
       <MainHeader className={classes.mainHeaderFilter} style={{ display: 'flex' }}>
         <Paper className={classes.mainPaperFilter}>

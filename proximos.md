@@ -11,19 +11,53 @@ As tarefas foram agrupadas em entregas, ordenadas da mais prioritária para a ma
 Esta entrega junta as duas frentes obrigatórias da primeira janela.
 Já existem no backend `InstagramServices`, `FacebookServices` e `MetaController`, então o trabalho é de refatoração, robustez e UX, não criação do zero.
 
-Integração Instagram e Facebook (refatoração)
-- Revisar fluxo de autenticação Meta (OAuth, refresh de token, webhook de mensagens).
-- Padronizar entrada de mensagens IG/FB no mesmo pipeline de tickets/contatos do WhatsApp.
-- Tratar mídias (imagem, vídeo, áudio, stickers, reactions) e respostas a stories/comentários.
-- Garantir envio de mensagens fora da janela de 24h (mensagens de template/aprovadas pela Meta).
-- Tela de conexão única ("Conexões") com status, reconectar, desconectar e logs de erro.
-- Testes de ponta a ponta: receber, responder, encerrar atendimento, transferir fila.
+Integração Instagram e Facebook (refatoração) — ✅ 90% CONCLUÍDO (2026-05-15)
+- [x] Revisar fluxo de autenticação Meta (OAuth, refresh de token, webhook de mensagens).
+      - Corrigido bug crítico: validação de assinatura do webhook rejeitava IG (usava só
+        FACEBOOK_APP_SECRET; agora aceita FACEBOOK_APP_SECRET + INSTAGRAM_APP_SECRET).
+      - Refresh de token IG (ig_refresh_token) + fallback quando ig_exchange_token falha.
+      - CheckMetaConnectionsService (cron 6h): valida/renova token, marca DISCONNECTED.
+      - subscribe corrigido para `me/subscribed_apps`; base URL IG sem prefixo de versão.
+- [x] Padronizar entrada de mensagens IG/FB no mesmo pipeline de tickets/contatos do WhatsApp.
+      - Recepção validada em produção (ticket + contato + mensagens criados).
+- [x] Tratar mídias (imagem, vídeo, áudio, stickers) — stickers/mídia de DM já funcionam.
+      Reactions e respostas a stories/comentários: FORA DE ESCOPO (definido com cliente).
+- [ ] Garantir envio fora da janela de 24h (template/aprovadas Meta) — PENDENTE (Item 2, crítico).
+- [~] Tela "Conexões": status real + erro persistido no backend (campo metaConnectionError).
+      Falta expor erro/status na UI (ajuste leve de frontend).
+- [ ] Testes de ponta a ponta — PENDENTE.
+
+> BLOQUEIO EXTERNO (não-código): app Meta exige App Review aprovado das permissões
+> instagram_business_basic / instagram_business_manage_messages / instagram_manage_comments
+> para contas de clientes (não-testers) conectarem. App está Live mas review incompleto.
+> Só contas adicionadas no painel "Generate access tokens" funcionam hoje.
+> Restante (10%): ajustes leves de frontend + App Review (processo Meta).
 
 Tutoriais (reformulação)
 - Permitir editar tutorial existente (texto, imagem, PDF, vídeo embed).
 - Upload de anexos no tutorial (reaproveitar `FileServices`).
 - Componente "vincular tutorial" exposto como ícone (i/?) ao lado de áreas/botões do sistema.
 - Ao clicar no ícone, abrir modal com o tutorial vinculado àquela área.
+
+PLANO (definido 2026-05-15) — base: sistema "Helps" já existe (CRUD completo).
+Storage: SEM MinIO — disco local da VPS (67GB livres), reusar config/upload.ts
+(`multer.diskStorage` + `public/companyX/helps/{helpId}/`). Vídeo = embed URL,
+nunca upload de arquivo de vídeo. Limite de tamanho + whitelist de mimetype.
+- [x] Migration: Help ganha `content` (TEXT) e `areaKey` (STRING, indexed, nullable).
+- [x] Migration: nova tabela `HelpAttachments` (helpId, name, path, type, mimetype, size).
+- [x] Backend: estender Create/Update (content, areaKey); rotas POST/DELETE anexos;
+      GET /helps/by-area/:areaKey; GET /helps/areas; DeleteService apaga arquivos físicos.
+      Constante compartilhada src/constants/helpAreas.ts (14 áreas). tsc OK.
+- [x] Frontend: editor (content multiline) + dropdown areaKey + uploader/lista de anexos
+      no HelpsManager; hook useHelps estendido.
+- [x] Componente `<HelpHint areaKey>`: ícone (?) → modal com título, vídeo embed
+      (YouTube), conteúdo markdown e anexos (imagem inline / link).
+- [x] Piloto: `<HelpHint areaKey="connections">` plantado no header de Conexões.
+- [ ] Espalhar `<HelpHint>` nas demais áreas prioritárias (pendente).
+
+> Migrations aplicadas no banco DEV (azchat_dev). NÃO aplicadas em produção ainda.
+> Storage: disco local da VPS, public/helps/{helpId}/. Sem MinIO. Vídeo = embed.
+> Build do frontend NÃO executado (política: usuário testa localmente).
 
 ---
 

@@ -9,7 +9,6 @@ import TabPanel from "../../components/TabPanel";
 import SchedulesForm from "../../components/SchedulesForm";
 import CompaniesManager from "../../components/CompaniesManager";
 import PlansManager from "../../components/PlansManager";
-import HelpsManager from "../../components/HelpsManager";
 import Options from "../../components/Settings/Options";
 import Whitelabel from "../../components/Settings/Whitelabel";
 
@@ -23,6 +22,7 @@ import OnlyForSuperUser from "../../components/OnlyForSuperUser";
 import useCompanySettings from "../../hooks/useSettings/companySettings";
 import useSettings from "../../hooks/useSettings";
 import ForbiddenPage from "../../components/ForbiddenPage/index.js";
+import HelpHint from "../../components/HelpHint";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -139,7 +139,10 @@ const SettingsCustom = () => {
         :
         <>
           <MainHeader>
-            <Title>{i18n.t("settings.title")}</Title>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Title>{i18n.t("settings.title")}</Title>
+              <HelpHint areaKey="settings" />
+            </span>
           </MainHeader>
           <Paper className={classes.mainPaper} elevation={1}>
             <Tabs
@@ -155,7 +158,6 @@ const SettingsCustom = () => {
               {schedulesEnabled && <Tab label="Horários" value={"schedules"} />}
               {isSuper() ? <Tab label="Empresas" value={"companies"} /> : null}
               {isSuper() ? <Tab label={i18n.t("settings.tabs.plans")} value={"plans"} /> : null}
-              {isSuper() ? <Tab label={i18n.t("settings.tabs.helps")} value={"helps"} /> : null}
               {isSuper() ? <Tab label="Whitelabel" value={"whitelabel"} /> : null}
             </Tabs>
             <Paper className={classes.paper} elevation={0}>
@@ -190,13 +192,6 @@ const SettingsCustom = () => {
                       <PlansManager />
                     </TabPanel>
 
-                    <TabPanel
-                      className={classes.container}
-                      value={tab}
-                      name={"helps"}
-                    >
-                      <HelpsManager />
-                    </TabPanel>
                     <TabPanel
                       className={classes.container}
                       value={tab}

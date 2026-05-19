@@ -5,8 +5,11 @@ import {
   UpdatedAt,
   Model,
   PrimaryKey,
-  AutoIncrement
+  AutoIncrement,
+  DataType,
+  HasMany
 } from "sequelize-typescript";
+import HelpAttachment from "./HelpAttachment";
 
 @Table({
   tableName: "Helps"
@@ -23,11 +26,20 @@ class Help extends Model<Help> {
   @Column
   description: string;
 
+  @Column(DataType.TEXT)
+  content: string;
+
+  @Column
+  areaKey: string;
+
   @Column
   video: string;
 
   @Column
   link: string;
+
+  @HasMany(() => HelpAttachment)
+  attachments: HelpAttachment[];
 
   @CreatedAt
   createdAt: Date;

@@ -34,6 +34,7 @@ import Tooltip from "@material-ui/core/Tooltip";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
+import HelpHint from "../../components/HelpHint";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
@@ -532,13 +533,16 @@ const Quickemessages = () => {
       <MainHeader>
         <Grid className={classes.headerToolbar} container spacing={1} alignItems="center">
           <Grid xs={12} md={3} item>
-            <Typography
-              component="h1"
-              variant={isMdUp ? "h5" : "subtitle1"}
-              className={classes.pageTitle}
-            >
-              {i18n.t("quickMessages.title")}
-            </Typography>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Typography
+                component="h1"
+                variant={isMdUp ? "h5" : "subtitle1"}
+                className={classes.pageTitle}
+              >
+                {i18n.t("quickMessages.title")}
+              </Typography>
+              <HelpHint areaKey="quick-messages" />
+            </span>
           </Grid>
           <Grid xs={12} md={9} item>
             <Grid spacing={1} container alignItems="center">

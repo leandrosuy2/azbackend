@@ -45,6 +45,7 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 
 import api from "../../services/api";
@@ -660,7 +661,10 @@ const Connections = () => {
         :
         <>
           <MainHeader>
-            <Title>{i18n.t("connections.title")} ({whatsApps.length})</Title>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Title>{i18n.t("connections.title")} ({whatsApps.length})</Title>
+              <HelpHint areaKey="connections" />
+            </span>
             <MainHeaderButtonsWrapper>
               <Button
                 variant="contained"

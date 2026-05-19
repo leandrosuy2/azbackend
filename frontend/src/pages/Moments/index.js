@@ -9,6 +9,7 @@ import { Grid, Paper } from "@material-ui/core";
 import Title from "../../components/Title";
 import ForbiddenPage from "../../components/ForbiddenPage";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import HelpHint from "../../components/HelpHint";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -52,7 +53,10 @@ const ChatMoments = () => {
       <MainHeader>
         <Grid style={{ width: "99.6%" }} container justifyContent="center" alignItems="flex-start">
           <Grid xs={12} sm={8} xl={4} item >
-            <Title>{"Painel de Atendimentos"}</Title>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Title>{"Painel de Atendimentos"}</Title>
+              <HelpHint areaKey="moments" />
+            </span>
           </Grid>
           <Grid style={{ width: "100%", height: "100vh" }} item >
             <Paper

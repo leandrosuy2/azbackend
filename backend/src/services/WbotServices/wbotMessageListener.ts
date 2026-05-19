@@ -5451,7 +5451,11 @@ const wbotMessageListener = (wbot: Session, companyId: number): void => {
   wbot.ev.on("messages.update", (messageUpdate: WAMessageUpdate[]) => {
     if (messageUpdate.length === 0) return;
     messageUpdate.forEach(async (message: WAMessageUpdate) => {
-      (wbot as WASocket)!.readMessages([message.key]);
+      (wbot as WASocket)!.readMessages([message.key]).catch(err => {
+        logger.warn(
+          `Could not send read receipt on message update. Maybe whatsapp session disconnected? Err: ${err}`
+        );
+      });
 
       const msgUp = { ...messageUpdate };
 

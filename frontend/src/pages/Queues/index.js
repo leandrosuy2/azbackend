@@ -18,6 +18,7 @@ import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 import api from "../../services/api";
@@ -194,7 +195,10 @@ const Queues = () => {
         }}
       />
           <MainHeader>
-            <Title>{i18n.t("queues.title")} ({queues.length})</Title>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Title>{i18n.t("queues.title")} ({queues.length})</Title>
+              <HelpHint areaKey="queues" />
+            </span>
             <MainHeaderButtonsWrapper>
               <Button
                 variant="contained"

@@ -24,6 +24,7 @@ import DownloadIcon from "@material-ui/icons/GetApp";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import HelpHint from "../../components/HelpHint";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
@@ -223,7 +224,10 @@ const ContactLists = () => {
       <MainHeader>
         <Grid style={{ width: "99.6%" }} container>
           <Grid xs={12} sm={8} item>
-            <Title>{i18n.t("contactLists.title")}</Title>
+            <span style={{ display: "flex", alignItems: "center" }}>
+              <Title>{i18n.t("contactLists.title")}</Title>
+              <HelpHint areaKey="contact-lists" />
+            </span>
           </Grid>
           <Grid xs={12} sm={4} item>
             <Grid spacing={2} container>
